@@ -39,7 +39,7 @@ args = parser.parse_args()
 
 K = args.K
 
-X, y = load_svmlight_file(os.path.abspath(args.input_file))
+X, y = load_svmlight_file(os.path.expanduser(args.input_file))
 
 print("Data is loaded: {}".format(X.shape))
 
