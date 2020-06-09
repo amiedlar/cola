@@ -74,8 +74,11 @@ class Monitor(object):
             self._log_global(vk, Akxk, xk, i_iter, solver)
         elif self.mode == None:
             pass
+        elif self.mode == 'all':
+            self._log_local(vk, Akxk, xk, i_iter, solver)
+            self._log_global(vk, Akxk, xk, i_iter, solver)
         else:
-            raise NotImplementedError("[local, global, None] are expected mode, got {}".format(self.mode))
+            raise NotImplementedError("[local, global, all, None] are expected mode, got {}".format(self.mode))
 
         self.previous_time = time.time()
 
@@ -107,18 +110,13 @@ class Monitor(object):
         w = self.solver.grad_f(v)
 
         # Compute squared norm of consensus violation
-        v_mag = float(np.linalg.norm(v,2) ** 2)
-        record['cv2'] = float(np.linalg.norm(vk - v, 2) ** 2)
-        if v_mag != 0.0:
-            record['cv2'] /= v_mag
+        record['cv2'] = record['cv2r'] = float(np.linalg.norm(vk - v, 2) ** 2)
         # Compute the value of minimizer objective
-        xk_mag = np.linalg.norm(xk,2)
+        record['mag_xk'] = np.linalg.norm(xk,2)
+        record['mag_v'] = float(np.linalg.norm(v,2) ** 2)
         val_gk = self.solver.gk(xk)
         record['g'] = comm.all_reduce(val_gk, 'SUM')
         record['f'] = self.solver.f(v)
-        if xk_mag != 0.0:
-            record['g'] /= xk_mag
-            record['f'] /= xk_mag
 
         # Compute the value of conjugate objective
         val_gk_conj = self.solver.gk_conj(w)

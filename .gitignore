@@ -106,4 +106,3 @@ venv.bak/
 # misc
 data/
 *.c
-log/
