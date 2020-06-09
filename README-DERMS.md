@@ -30,6 +30,6 @@ mpirun -n $world_size --oversubscribe python3 run_cola.py \
     --use_split_dataset
 ```
 from sklearn.datasets import dump_svmlight_file
-from numpy import loadtxt
-X = loadtxt('../data/data.txt')
-dump_svmlight_file(X[:,1:5], X[:,0],'../data/data.svm')
+import numpy as np
+X = np.loadtxt('../../data/data.txt')
+dump_svmlight_file(X[:,0:5], X[:,0],'data/data1.svm')

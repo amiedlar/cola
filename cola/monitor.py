@@ -149,7 +149,7 @@ class Monitor(object):
     def save(self, Akxk, xk, weightname=None, logname=None):
         rank = self.rank
         if logname:
-            logfile = os.path.join(self.output_dir, str(rank) + logname)
+            logfile = os.path.join(self.output_dir, logname)
             pd.DataFrame(self.records).to_csv(logfile)
             print("Data has been save to {} on node 0".format(logfile))
 
