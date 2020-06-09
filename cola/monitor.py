@@ -116,7 +116,7 @@ class Monitor(object):
         w = self.solver.grad_f(v)
 
         # Compute squared norm of consensus violation
-        record['cv2'] = record['cv2r'] = float(np.linalg.norm(vk - v, 2) ** 2)
+        record['cv2'] = float(np.linalg.norm(vk - v, 2) ** 2)
         # Compute the value of minimizer objective
         record['mag_xk'] = np.linalg.norm(xk,2)
         record['mag_v'] = float(np.linalg.norm(v,2) ** 2)
