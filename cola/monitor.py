@@ -103,16 +103,22 @@ class Monitor(object):
         record['time'] = self.running_time
 
         # v := A x
-        v = comm.all_reduce(Akxk, op='SUM')
+        v = comm.all_reduce(np.array(Akxk), op='SUM')
         w = self.solver.grad_f(v)
 
         # Compute squared norm of consensus violation
+        v_mag = float(np.linalg.norm(v,2) ** 2)
         record['cv2'] = float(np.linalg.norm(vk - v, 2) ** 2)
-
+        if v_mag != 0.0:
+            record['cv2'] /= v_mag
         # Compute the value of minimizer objective
+        xk_mag = np.linalg.norm(xk,2)
         val_gk = self.solver.gk(xk)
         record['g'] = comm.all_reduce(val_gk, 'SUM')
         record['f'] = self.solver.f(v)
+        if xk_mag != 0.0:
+            record['g'] /= xk_mag
+            record['f'] /= xk_mag
 
         # Compute the value of conjugate objective
         val_gk_conj = self.solver.gk_conj(w)
@@ -144,8 +150,8 @@ class Monitor(object):
 
     def save(self, Akxk, xk, weightname=None, logname=None):
         rank = self.rank
-        if rank == 0 and logname:
-            logfile = os.path.join(self.output_dir, logname)
+        if logname:
+            logfile = os.path.join(self.output_dir, str(rank) + logname)
             pd.DataFrame(self.records).to_csv(logfile)
             print("Data has been save to {} on node 0".format(logfile))
 
@@ -156,13 +162,14 @@ class Monitor(object):
 
             else:
                 # If features are split, then concatenate xk's weight
-                size = [0] * self.world_size
+                size = np.array([0] * self.world_size)
                 size[rank] = len(xk)
                 size = comm.all_reduce(size, op='SUM')
                 # the size is [len(x_0), len(x_1), ..., len(x_{K-1})]
 
                 weight = np.zeros(sum(size))
                 weight[sum(size[:rank]): sum(size[:rank]) + len(xk)] = np.array(xk)
+                print(f'node {rank} weights: {xk}')
                 weight = comm.reduce(weight, root=0, op='SUM')
 
             if rank == 0:

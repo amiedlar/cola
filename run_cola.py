@@ -9,6 +9,8 @@ from cola.cocoasolvers import configure_solver
 from cola.algo import run_algorithm
 from cola.monitor import Monitor
 
+# import pyximport
+# pyximport.install() 
 
 @click.command()
 @click.option('--dataset', type=click.STRING, help='The type of dataset.')

@@ -39,7 +39,7 @@ EPSILON_DATASET_PATH='/datasets/epsilon_normalized.bz2'
 
 world_size=20
 mpirun -n $world_size python scripts/run_cola.py \
-    --split_by 'features' \
+    --split_by 'samples' \
     --max_global_steps 10 \
     --graph_topology 'complete' \
     --exit_time 1000.0 \
@@ -52,6 +52,22 @@ mpirun -n $world_size python scripts/run_cola.py \
     --ckpt_freq 2 \
     --dataset_path ${EPSILON_DATASET_PATH} \
     --dataset epsilon \
+    --solvername ElasticNet \
+    --algoritmname cola
+
+mpirun -n $world_size --oversubscribe python3 run_cola_derms.py \
+    --split_by 'features' \
+    --max_global_steps 10 \
+    --graph_topology 'complete' \
+    --exit_time 1000.0 \
+    --theta 1e-7 \
+    --l1_ratio 1 \
+    --lambda_ 1e-4 \
+    --local_iters 10.0 \
+    --output_dir ${OUTPUT_DIR} \
+    --dataset_size 'all' \
+    --ckpt_freq 2 \
+    --dataset test \
     --solvername ElasticNet \
     --algoritmname cola
 ```

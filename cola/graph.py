@@ -92,11 +92,11 @@ class RingGraph(UndirectedGraph):
 
         if n > 3:
             # Find largest real part
-            eigenvalues, _ = eigs(data, k=2, which='LR')
+            eigenvalues, _ = eigs(data.asfptype(), k=2, which='LR')
             lambda2 = min(abs(i.real) for i in eigenvalues)
 
             # Find smallest real part
-            eigenvalues, _ = eigs(data, k=1, which='SR')
+            eigenvalues, _ = eigs(data.asfptype(), k=1, which='SR')
             lambdan = eigenvalues[0].real
         else:
             eigenvals = sorted(np.linalg.eigvals(data.toarray()), reverse=True)
@@ -150,11 +150,11 @@ class ChainGraph(UndirectedGraph):
 
         if n > 3:
             # Find largest real part
-            eigenvalues, _ = eigs(data, k=2, which='LR')
+            eigenvalues, _ = eigs(data.asfptype(), k=2, which='LR')
             lambda2 = min(abs(i.real) for i in eigenvalues)
 
             # Find smallest real part
-            eigenvalues, _ = eigs(data, k=1, which='SR')
+            eigenvalues, _ = eigs(data.asfptype(), k=1, which='SR')
             lambdan = eigenvalues[0].real
         else:
             eigenvals = sorted(np.linalg.eigvals(data.toarray()), reverse=True)
@@ -218,11 +218,11 @@ class NonUniformWeightRingGraph(RingGraph):
 
         if n > 3:
             # Find largest real part
-            eigenvalues, _ = eigs(data, k=2, which='LR')
+            eigenvalues, _ = eigs(data.asfptype(), k=2, which='LR')
             lambda2 = min(abs(i.real) for i in eigenvalues)
 
             # Find smallest real part
-            eigenvalues, _ = eigs(data, k=1, which='SR')
+            eigenvalues, _ = eigs(data.asfptype(), k=1, which='SR')
             lambdan = eigenvalues[0].real
         else:
             eigenvals = sorted(np.linalg.eigvals(data.toarray()), reverse=True)
@@ -294,11 +294,11 @@ class TwoDimGridGraph(UndirectedGraph):
 
         if n > 3:
             # Find largest real part
-            eigenvalues, _ = eigs(data, k=2, which='LR')
+            eigenvalues, _ = eigs(data.asfptype(), k=2, which='LR')
             lambda2 = min(abs(i.real) for i in eigenvalues)
 
             # Find smallest real part
-            eigenvalues, _ = eigs(data, k=1, which='SR')
+            eigenvalues, _ = eigs(data.asfptype(), k=1, which='SR')
             lambdan = eigenvalues[0].real
         else:
             eigenvals = sorted(np.linalg.eigvals(data.toarray()), reverse=True)
@@ -366,11 +366,11 @@ class NConnectedCycleGraph(UndirectedGraph):
 
         if n > 3:
             # Find largest real part
-            eigenvalues, _ = eigs(data, k=2, which='LR')
+            eigenvalues, _ = eigs(data.asfptype(), k=2, which='LR')
             lambda2 = min(abs(i.real) for i in eigenvalues)
 
             # Find smallest real part
-            eigenvalues, _ = eigs(data, k=1, which='SR')
+            eigenvalues, _ = eigs(data.asfptype(), k=1, which='SR')
             lambdan = eigenvalues[0].real
         else:
             eigenvals = sorted(np.linalg.eigvals(data.toarray()), reverse=True)

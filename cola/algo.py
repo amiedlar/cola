@@ -8,10 +8,10 @@ from . import communication as comm
 def run_algorithm(algorithm, Ak, b, solver, gamma, theta, max_global_steps, local_iters, n_nodes, graph, monitor):
     r"""Run cocoa family algorithms."""
     with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            'Objective did not converge. You might want to increase the number of iterations. '
-            'Fitting data with very small alpha may cause precision problems.')
+        # warnings.filterwarnings(
+        #     "ignore",
+        #     'Objective did not converge. You might want to increase the number of iterations. '
+        #     'Fitting data with very small alpha may cause precision problems.')
 
         comm.barrier()
         if algorithm == 'cola':
