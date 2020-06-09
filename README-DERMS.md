@@ -2,8 +2,8 @@
 
 From the cola-master directory:
 ```
-world_size=3
-python3 split_dataset.py --K=$world_size --input_file=../data/data.svm --outdir=data/rderms
+world_size=1
+python3 split_dataset.py --K=$world_size --input_file=~/working/data/data.svm --outdir=data/rderms
 ```
 
 To run cola:
@@ -32,6 +32,4 @@ mpirun -n $world_size --oversubscribe python3 run_cola.py \
 from sklearn.datasets import dump_svmlight_file
 from numpy import loadtxt
 X = loadtxt('../data/data.txt')
-y = [1/(X.shape[0]**2) for i in range(X.shape[0])]
-dump_svmlight_file(X,y,'data2.svm')
 dump_svmlight_file(X[:,1:5], X[:,0],'../data/data.svm')
