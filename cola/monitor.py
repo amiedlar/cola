@@ -45,6 +45,8 @@ class Monitor(object):
         self.exit_time = exit_time or np.inf
 
         self.records = []
+        self.records_l = []
+        self.records_g = []
         self.mode = mode
         self.ckpt_freq = ckpt_freq
         self.output_dir = output_dir
@@ -75,8 +77,12 @@ class Monitor(object):
         elif self.mode == None:
             pass
         elif self.mode == 'all':
+            self.records = self.records_l
             self._log_local(vk, Akxk, xk, i_iter, solver)
+            self.records_l = self.records
+            self.records = self.records_g
             self._log_global(vk, Akxk, xk, i_iter, solver)
+            self.records_g = self.records
         else:
             raise NotImplementedError("[local, global, all, None] are expected mode, got {}".format(self.mode))
 
@@ -149,9 +155,15 @@ class Monitor(object):
     def save(self, Akxk, xk, weightname=None, logname=None):
         rank = self.rank
         if logname:
-            logfile = os.path.join(self.output_dir, logname)
-            pd.DataFrame(self.records).to_csv(logfile)
-            print("Data has been save to {} on node 0".format(logfile))
+            if self.mode == 'all':
+                self.records = self.records_g
+                logfile = os.path.join(self.output_dir, f'{rank}'+logname)
+                pd.DataFrame(self.records_l).to_csv(logfile)
+                print("Data has been save to {} on node {}".format(logfile, rank))
+            if rank == 0:
+                logfile = os.path.join(self.output_dir, logname)
+                pd.DataFrame(self.records).to_csv(logfile)
+                print("Data has been save to {} on node 0".format(logfile))
 
         if weightname:
             if self.split_by_samples:

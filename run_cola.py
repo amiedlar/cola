@@ -74,7 +74,7 @@ def main(dataset, dataset_path, dataset_size, use_split_dataset, split_by, rando
                              max_global_steps, local_iters, world_size,
                              graph, monitor)
 
-    monitor.save(Akxk, xk, weightname='weight.npy', logname=f'result{rank}.csv')
+    monitor.save(Akxk, xk, weightname='weight.npy', logname=f'result.csv')
 
 
 if __name__ == '__main__':
