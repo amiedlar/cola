@@ -17,7 +17,7 @@ mpirun -n $world_size --oversubscribe python3 run_cola.py \
     --max_global_steps 20 \
     --graph_topology 'complete' \
     --exit_time 1000.0 \
-    --logmode='global' \
+    --logmode='all' \
     --theta 1e-7 \
     --l1_ratio 0.5 \
     --lambda_ 1e-4 \

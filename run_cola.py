@@ -19,7 +19,7 @@ from cola.monitor import Monitor
 @click.option('--output_dir', type=click.STRING, default=None, help='Save metrics in the training.')
 @click.option('--dataset_size', default='small', type=click.Choice(['small', 'all']), help='Size of dataset')
 @click.option('--use_split_dataset', is_flag=True)
-@click.option('--logmode', default='local', type=click.Choice(['local', 'global']),
+@click.option('--logmode', default='local', type=click.Choice(['local', 'global', 'all']),
               help='Log local or global information.')
 @click.option('--split_by', default='samples', type=click.Choice(['samples', 'features']),
               help='Split data matrix by samples or features.')
