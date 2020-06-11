@@ -89,7 +89,10 @@ class Monitor(object):
         self.previous_time = time.time()
 
         max_running_time = comm.all_reduce(self.running_time, op='MAX')
-        return max_running_time > self.exit_time
+        gap = 100
+        if self.mode == 'all':
+            gap = self.records_g[-1]['gap']
+        return max_running_time > self.exit_time or abs(gap) < 1e-15
 
     def _log_local(self, vk, Akxk, xk, i_iter, solver):
         record = {}
@@ -179,7 +182,7 @@ class Monitor(object):
 
                 weight = np.zeros(sum(size))
                 weight[sum(size[:rank]): sum(size[:rank]) + len(xk)] = np.array(xk)
-                print(f'node {rank} weights: {xk}')
+                # print(f'node {rank} weights: {xk}')
                 weight = comm.reduce(weight, root=0, op='SUM')
 
             if rank == 0:

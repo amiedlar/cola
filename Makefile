@@ -6,8 +6,8 @@ clean:
 
 .PHONY: build
 build: 
-	python setup.py build_ext --inplace
+	python3 setup.py build_ext --inplace
 
 .PHONY: install
 install:
-	python setup.py install
+	python3 setup.py install --user

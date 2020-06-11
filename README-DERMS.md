@@ -2,7 +2,7 @@
 
 From the cola-master directory:
 ```
-world_size=1
+world_size=4
 python3 split_dataset.py --K=$world_size --input_file=~/working/data/data.svm --outdir=data/rderms
 ```
 
