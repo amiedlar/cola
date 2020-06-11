@@ -55,15 +55,38 @@ def plot_primal_dual(n_nodes, data):
     plt.title('Primal')
     plt.xlabel('global iteration step')
     plt.ylabel('$\mathcal{P}(w)$')
-    for i in range(n_nodes):
-        plt.plot(data['i_iter'], data['P'])
+    plt.plot(data['i_iter'], data['P'])
     
     plt.subplot(122)
     plt.title('Dual')
     plt.xlabel('global iteration step')
     plt.ylabel('$\mathcal{D}(x)$')
-    for i in range(n_nodes):
-        plt.plot(data['i_iter'], data['D'])
+    plt.plot(data['i_iter'], data['D'])
+
+    plt.show()
+
+def plot_minimizers(n_nodes, data):
+    plt.figure(f'Minimizer Values, {n_nodes} nodes')
+    plt.title('Minimizer functions per iteration')
+    plt.subplot(221)
+    plt.xlabel('global iteration step')
+    plt.ylabel('$f(Ax)$')
+    plt.plot(data['i_iter'], data['f'])
+    
+    plt.subplot(222)
+    plt.xlabel('global iteration step')
+    plt.ylabel('$g(x)$')
+    plt.plot(data['i_iter'], data['g'])
+
+    plt.subplot(223)
+    plt.xlabel('global iteration step')
+    plt.ylabel('$f^*(w)$')
+    plt.plot(data['i_iter'], data['f_conj'])
+    
+    plt.subplot(224)
+    plt.xlabel('global iteration step')
+    plt.ylabel('$g^*(-w^TA)$')
+    plt.plot(data['i_iter'], data['g_conj'])
 
     plt.show()
 
@@ -80,6 +103,7 @@ def plot_results(n_nodes):
     global_results = pd.read_csv('log/result.csv').loc[1:]
     
     plot_local_results(n_nodes, local_results)
+    plot_minimizers(n_nodes, global_results)
     plot_primal_dual(n_nodes, global_results)
     plot_duality_gap(n_nodes, global_results)
     
