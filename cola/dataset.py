@@ -401,7 +401,8 @@ def load_dataset(name, rank, world_size, dataset_size, datapoints, split_by, dat
     else:
         percent = 0.1 if dataset_size == 'small' else 1
     assert split_by in ['samples', 'features']
-
+    n_features = 0
+    features_in_partition = 0
     if name in ['test', 'test_sparse']:
         n_samples_test = 1000
         n_features_test = 100
@@ -422,6 +423,8 @@ def load_dataset(name, rank, world_size, dataset_size, datapoints, split_by, dat
             rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state, datapoints=datapoints)
     else:
         raise NotImplementedError
+
+    print(f'Rank {rank:3} features: {features_in_partition}')
 
     # Transpose the matrix depending on the matrix split direction
     if split_by == 'samples':
