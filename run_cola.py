@@ -17,8 +17,8 @@ from cola.monitor import Monitor
 @click.option('--solvername', type=click.STRING, help='The name of solvers.')
 @click.option('--algoritmname', type=click.STRING, help='The name of algorithm')
 @click.option('--output_dir', type=click.STRING, default=None, help='Save metrics in the training.')
-@click.option('--dataset_size', default=None, type=click.Choice([None, 'small', 'all']), help='Size of dataset',)
-@click.option('--datapoints', default=None, type=click.INT, help='Number of datapoints of dataset to load',)
+@click.option('--dataset_size', default='small', type=click.Choice(['small', 'all']), help='Size of dataset',)
+@click.option('--datapoints', default=-1, type=click.INT, help='Number of datapoints of dataset to load',)
 @click.option('--use_split_dataset', is_flag=True)
 @click.option('--logmode', default='local', type=click.Choice(['local', 'global', 'all']),
               help='Log local or global information.')
@@ -67,6 +67,9 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
                               lambda_=lambda_, C=c, random_state=random_state)
 
     # Add hooks to log and save metrics.
+    if dataset:
+        import os
+        output_dir = os.path.join(output_dir, dataset)
     monitor = Monitor(solver, output_dir, ckpt_freq,
                       exit_time, split_by, logmode)
 

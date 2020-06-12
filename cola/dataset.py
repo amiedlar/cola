@@ -27,14 +27,16 @@ def maybe_cache(func):
     return func_wrapper
 
 
-def dist_coord_selection(rank, world_size, n_coords):
-    shuffled_index = np.random.permutation(np.arange(n_coords))
+def dist_coord_selection(rank, world_size, max_index, n_coords=None):
+    if not n_coords:
+        n_coords = max_index
+    shuffled_index = np.random.permutation(np.arange(max_index))[:n_coords]
     rank_coords = shuffled_index[rank::world_size]
     return rank_coords
 
 
 @maybe_cache
-def dist_row_read_one(rank, world_size, n_blob, n_features, filename, zero_based, length=10000):
+def dist_row_read_one(rank, world_size, n_blob, n_features, filename, zero_based, length=10000, datapoints=0):
     X_train, y_train = [], []
     rank_coords = []
     total_data_loaded = 0
@@ -65,8 +67,8 @@ def dist_row_read_one(rank, world_size, n_blob, n_features, filename, zero_based
 
 
 @maybe_cache
-def dist_col_read_one(rank, world_size, n_blob, n_features, filename, zero_based, length=100):
-    rank_coords = dist_coord_selection(rank, world_size, n_features)
+def dist_col_read_one(rank, world_size, n_blob, n_features, filename, zero_based, length=100, datapoints=0):
+    rank_coords = dist_coord_selection(rank, world_size, n_features, datapoints)
 
     offset = 0
     X_train, y_train = None, None
@@ -201,13 +203,11 @@ class Epsilon(object):
         n_features = 2000
         zero_based = False
         if split_by == 'features':
-            A_block, b, features_in_partition = dist_col_read_one(rank, world_size, n_blob, 
-                                                                  datapoints if datapoints else n_features, file,
-                                                                  zero_based, length=100*1024**2)
+            A_block, b, features_in_partition = dist_col_read_one(rank, world_size, n_blob, n_features, file,
+                                                                  zero_based, length=100*1024**2, datapoints=datapoints)
         elif split_by == 'samples':
-            A_block, b, features_in_partition = dist_row_read_one(rank, world_size, n_blob, 
-                                                                  datapoints if datapoints else n_features, file,
-                                                                  zero_based, length=100*1024**2)
+            A_block, b, features_in_partition = dist_row_read_one(rank, world_size, n_blob, n_features, file,
+                                                                  zero_based, length=100*1024**2, datapoints=datapoints)
         else:
             raise NotImplementedError
 
@@ -222,13 +222,11 @@ class URL(object):
         n_features = 3231961
         zero_based = False
         if split_by == 'features':
-            A_block, b, features_in_partition = dist_col_read_one(rank, world_size, n_blob, 
-                                                                  datapoints if datapoints else n_features, file,
-                                                                  zero_based, length=100*1024**2)
+            A_block, b, features_in_partition = dist_col_read_one(rank, world_size, n_blob, n_features, file,
+                                                                  zero_based, length=100*1024**2, datapoints=datapoints)
         elif split_by == 'samples':
-            A_block, b, features_in_partition = dist_row_read_one(rank, world_size, n_blob, 
-                                                                  datapoints if datapoints else n_features, file,
-                                                                  zero_based, length=100*1024**2)
+            A_block, b, features_in_partition = dist_row_read_one(rank, world_size, n_blob, n_features, file,
+                                                                  zero_based, length=100*1024**2, datapoints=datapoints)
         else:
             raise NotImplementedError
 
@@ -245,12 +243,12 @@ class Webspam(object):
         memory_persize = 100 * 1024 ** 2
         if split_by == 'features':
             A_block, b, features_in_partition = dist_col_read_one(
-                rank, world_size, n_blob, datapoints if datapoints else n_features, file,
-                zero_based, length=memory_persize)
+                rank, world_size, n_blob, n_features, file,
+                zero_based, length=memory_persize, datapoints=datapoints)
         elif split_by == 'samples':
             A_block, b, features_in_partition = dist_row_read_one(
-                rank, world_size, n_blob, datapoints if datapoints else n_features, file,
-                zero_based, length=memory_persize)
+                rank, world_size, n_blob, n_features, file,
+                zero_based, length=memory_persize, datapoints=datapoints)
             A_block = A_block.T
         else:
             raise NotImplementedError
@@ -267,12 +265,12 @@ class RCV1Test(object):
         memory_persize = 100 * 1024 ** 2
         if split_by == 'features':
             A_block, b, features_in_partition = dist_col_read_one(
-                rank, world_size, n_blob, datapoints if datapoints else n_features, file,
-                zero_based, length=memory_persize)
+                rank, world_size, n_blob, n_features, file,
+                zero_based, length=memory_persize, datapoints=datapoints)
         elif split_by == 'samples':
             A_block, b, features_in_partition = dist_row_read_one(
-                rank, world_size, n_blob, datapoints if datapoints else n_features, file,
-                zero_based, length=memory_persize)
+                rank, world_size, n_blob, n_features, file,
+                zero_based, length=memory_persize, datapoints=datapoints)
             A_block = A_block.T
         else:
             raise NotImplementedError
@@ -395,11 +393,8 @@ def load_dataset(name, rank, world_size, dataset_size, datapoints, split_by, dat
     """
     warnings.warn("deprecated: use load_dataset_by_rank instead", DeprecationWarning)
     percent = 1
-    assert dataset_size in [None, 'small', 'all']
-    if not dataset_size:
-        assert datapoints and datapoints > 0
-    else:
-        percent = 0.1 if dataset_size == 'small' else 1
+    assert dataset_size in ['small', 'all']
+    percent = 0.1 if dataset_size == 'small' else 1
     assert split_by in ['samples', 'features']
     n_features = 0
     features_in_partition = 0
