@@ -17,7 +17,8 @@ from cola.monitor import Monitor
 @click.option('--solvername', type=click.STRING, help='The name of solvers.')
 @click.option('--algoritmname', type=click.STRING, help='The name of algorithm')
 @click.option('--output_dir', type=click.STRING, default=None, help='Save metrics in the training.')
-@click.option('--dataset_size', default='small', type=click.Choice(['small', 'all']), help='Size of dataset')
+@click.option('--dataset_size', default=None, type=click.Choice([None, 'small', 'all']), help='Size of dataset',)
+@click.option('--datapoints', default=None, type=click.INT, help='Number of datapoints of dataset to load',)
 @click.option('--use_split_dataset', is_flag=True)
 @click.option('--logmode', default='local', type=click.Choice(['local', 'global', 'all']),
               help='Log local or global information.')
@@ -35,7 +36,7 @@ from cola.monitor import Monitor
 @click.option('--c', type=float, help='Constant in the LinearSVM.')
 @click.option('--ckpt_freq', type=int, default=10, help='')
 @click.option('--exit_time', default=1000.0, help='The maximum running time of a node.')
-def main(dataset, dataset_path, dataset_size, use_split_dataset, split_by, random_state,
+def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, split_by, random_state,
          algoritmname, max_global_steps, local_iters, solvername, output_dir, exit_time, lambda_, l1_ratio, theta,
          graph_topology, c, logmode, ckpt_freq, n_connectivity):
 
@@ -55,10 +56,10 @@ def main(dataset, dataset_path, dataset_size, use_split_dataset, split_by, rando
         world_size, graph_topology, n_connectivity=n_connectivity)
 
     if use_split_dataset:
-        X, y = load_dataset_by_rank(dataset, rank, world_size, dataset_size, split_by,
+        X, y = load_dataset_by_rank(dataset, rank, world_size, dataset_size, datapoints, split_by,
                                     dataset_path=dataset_path, random_state=random_state)
     else:
-        X, y = load_dataset(dataset, rank, world_size, dataset_size, split_by,
+        X, y = load_dataset(dataset, rank, world_size, dataset_size, datapoints, split_by,
                             dataset_path=dataset_path, random_state=random_state)
 
     # Define subproblem

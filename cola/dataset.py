@@ -195,16 +195,18 @@ def dist_row_read(rank, world_size, n_blob, n_features, filenames):
 
 class Epsilon(object):
     @staticmethod
-    def dist_read(rank, world_size, file, percent=0.1, split_by='samples', random_state=42):
+    def dist_read(rank, world_size, file, percent=0.1, split_by='samples', random_state=42, datapoints=None):
         np.random.seed(random_state)
         n_blob = int(400000 * percent)
         n_features = 2000
         zero_based = False
         if split_by == 'features':
-            A_block, b, features_in_partition = dist_col_read_one(rank, world_size, n_blob, n_features, file,
+            A_block, b, features_in_partition = dist_col_read_one(rank, world_size, n_blob, 
+                                                                  datapoints if datapoints else n_features, file,
                                                                   zero_based, length=100*1024**2)
         elif split_by == 'samples':
-            A_block, b, features_in_partition = dist_row_read_one(rank, world_size, n_blob, n_features, file,
+            A_block, b, features_in_partition = dist_row_read_one(rank, world_size, n_blob, 
+                                                                  datapoints if datapoints else n_features, file,
                                                                   zero_based, length=100*1024**2)
         else:
             raise NotImplementedError
@@ -214,16 +216,18 @@ class Epsilon(object):
 
 class URL(object):
     @staticmethod
-    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42):
+    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None):
         np.random.seed(random_state)
         n_blob = int(2396130 * percent)
         n_features = 3231961
         zero_based = False
         if split_by == 'features':
-            A_block, b, features_in_partition = dist_col_read_one(rank, world_size, n_blob, n_features, file,
+            A_block, b, features_in_partition = dist_col_read_one(rank, world_size, n_blob, 
+                                                                  datapoints if datapoints else n_features, file,
                                                                   zero_based, length=100*1024**2)
         elif split_by == 'samples':
-            A_block, b, features_in_partition = dist_row_read_one(rank, world_size, n_blob, n_features, file,
+            A_block, b, features_in_partition = dist_row_read_one(rank, world_size, n_blob, 
+                                                                  datapoints if datapoints else n_features, file,
                                                                   zero_based, length=100*1024**2)
         else:
             raise NotImplementedError
@@ -233,7 +237,7 @@ class URL(object):
 
 class Webspam(object):
     @staticmethod
-    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42):
+    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None):
         np.random.seed(random_state)
         n_blob = int(350000 * percent)
         n_features = 16609143
@@ -241,10 +245,12 @@ class Webspam(object):
         memory_persize = 100 * 1024 ** 2
         if split_by == 'features':
             A_block, b, features_in_partition = dist_col_read_one(
-                rank, world_size, n_blob, n_features, file, zero_based, length=memory_persize)
+                rank, world_size, n_blob, datapoints if datapoints else n_features, file,
+                zero_based, length=memory_persize)
         elif split_by == 'samples':
             A_block, b, features_in_partition = dist_row_read_one(
-                rank, world_size, n_blob, n_features, file, zero_based, length=memory_persize)
+                rank, world_size, n_blob, datapoints if datapoints else n_features, file,
+                zero_based, length=memory_persize)
             A_block = A_block.T
         else:
             raise NotImplementedError
@@ -253,7 +259,7 @@ class Webspam(object):
 
 class RCV1Test(object):
     @staticmethod
-    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42):
+    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None):
         np.random.seed(random_state)
         n_blob = int(677399 * percent)
         n_features = 47236
@@ -261,10 +267,12 @@ class RCV1Test(object):
         memory_persize = 100 * 1024 ** 2
         if split_by == 'features':
             A_block, b, features_in_partition = dist_col_read_one(
-                rank, world_size, n_blob, n_features, file, zero_based, length=memory_persize)
+                rank, world_size, n_blob, datapoints if datapoints else n_features, file,
+                zero_based, length=memory_persize)
         elif split_by == 'samples':
             A_block, b, features_in_partition = dist_row_read_one(
-                rank, world_size, n_blob, n_features, file, zero_based, length=memory_persize)
+                rank, world_size, n_blob, datapoints if datapoints else n_features, file,
+                zero_based, length=memory_persize)
             A_block = A_block.T
         else:
             raise NotImplementedError
@@ -292,7 +300,7 @@ def test(n_samples, n_features, rank, world_size, split_by='samples', random_sta
         return X[:, indices], y
 
 
-def load_dataset_by_rank(name, rank, world_size, dataset_size, split_by, dataset_path=None, random_state=42,
+def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split_by, dataset_path=None, random_state=42,
                          transpose=True):
     r"""
     Assume the data_dir has following structure:
@@ -354,7 +362,7 @@ def load_dataset_by_rank(name, rank, world_size, dataset_size, split_by, dataset
     return X, y
 
 
-def load_dataset(name, rank, world_size, dataset_size, split_by, dataset_path=None, random_state=42):
+def load_dataset(name, rank, world_size, dataset_size, datapoints, split_by, dataset_path=None, random_state=42):
     """Load dataset in the distributed environment.
 
     Load matrix `X` and label `y` for this node in the network. The matrix `X` can be split by rows or columns
@@ -386,8 +394,12 @@ def load_dataset(name, rank, world_size, dataset_size, split_by, dataset_path=No
         labels to the data matrix
     """
     warnings.warn("deprecated: use load_dataset_by_rank instead", DeprecationWarning)
-
-    assert dataset_size in ['small', 'all']
+    percent = 1
+    assert dataset_size in [None, 'small', 'all']
+    if not dataset_size:
+        assert datapoints and datapoints > 0
+    else:
+        percent = 0.1 if dataset_size == 'small' else 1
     assert split_by in ['samples', 'features']
 
     if name in ['test', 'test_sparse']:
@@ -397,22 +409,17 @@ def load_dataset(name, rank, world_size, dataset_size, split_by, dataset_path=No
         if name == 'test_sparse':
             X = csc_matrix(X)
     elif name == 'epsilon':
-        percent = 0.1 if dataset_size == 'small' else 1
         X, y, features_in_partition, n_samples, n_features = Epsilon.dist_read(
-            rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state)
-        X = X.toarray()
+            rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state, datapoints=datapoints)
     elif name == 'url':
-        percent = 0.1 if dataset_size == 'small' else 1
         X, y, features_in_partition, n_samples, n_features = URL.dist_read(
-            rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state)
+            rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state, datapoints=datapoints)
     elif name == 'webspam':
-        percent = 0.1 if dataset_size == 'small' else 1
         X, y, features_in_partition, n_samples, n_features = Webspam.dist_read(
-            rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state)
+            rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state, datapoints=datapoints)
     elif name == 'rcv1':
-        percent = 0.1 if dataset_size == 'small' else 1
         X, y, features_in_partition, n_samples, n_features = RCV1Test.dist_read(
-            rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state)
+            rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state, datapoints=datapoints)
     else:
         raise NotImplementedError
 
