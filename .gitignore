@@ -108,3 +108,4 @@ data/
 cache/
 .vscode/
 *.c
+cache/joblib/cola/dataset/dist_col_read_one/func_code.py

@@ -18,7 +18,8 @@ def run_algorithm(algorithm, Ak, b, solver, gamma, theta, max_global_steps, loca
             Akxk, xk = cola(Ak, b, solver, gamma, theta,
                             max_global_steps, local_iters, n_nodes, graph, monitor)
         elif algorithm == 'cocoa':
-            raise NotImplementedError()
+            Akxk, xk = cocoa(Ak, b, solver, gamma, theta,
+                            max_global_steps, local_iters, n_nodes, monitor)
         else:
             raise NotImplementedError()
     return Akxk, xk
@@ -75,5 +76,49 @@ def cola(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, graph, 
         if (i_iter % monitor.ckpt_freq) == 0:
             monitor.save(
                 Akxk, xk, weightname='weight_epoch_{}.npy'.format(i_iter))
+
+    return Akxk, xk
+
+
+from mpi4py import MPI
+def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monitor):
+    if gamma <= 0 or gamma > 1:
+        raise ValueError("gamma should in (0, 1]: got {}".format(gamma))
+
+    # Shape of the matrix
+    n_rows, n_cols = Ak.shape
+
+    # Current rank of the node
+    rank = comm.get_rank()
+
+    # Initialize
+    xk = np.zeros(n_cols)
+    Akxk = np.zeros(n_rows)
+    v = np.zeros(n_rows)
+
+    sigma = gamma * K
+    localsolver.dist_init(Ak, b, theta, local_iters, sigma)
+
+    # Initial
+    monitor.log(np.zeros(n_rows), v, xk, 0, localsolver)
+    for i_iter in range(1, 1 + global_iters):
+        # Solve the suproblem using this estimates
+        delta_x, delta_v = localsolver.solve(v, v, xk)
+        delta_v = np.asarray(delta_v)
+        # update local variables
+        xk += gamma * np.asarray(delta_x)
+        Akxk += gamma * delta_v
+
+        # update shared variables
+        update = MPI.COMM_WORLD.allreduce(delta_v, op=MPI.SUM)
+        # assert (delta_v != old).any()
+        v += gamma * update
+
+        if monitor.log(v, v, xk, i_iter, localsolver):
+            print('break iterations here.')
+            # break
+
+        if (i_iter % monitor.ckpt_freq) == 0:
+            monitor.save(Akxk, xk, weightname='weight_epoch_{}.npy'.format(i_iter))
 
     return Akxk, xk
