@@ -103,18 +103,19 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
     monitor.log(np.zeros(n_rows), v, xk, 0, localsolver)
     for i_iter in range(1, 1 + global_iters):
         # Solve the suproblem using this estimates
-        delta_x, delta_v = localsolver.solve(v, Akxk, xk)
-        delta_v = np.asarray(delta_v)
+        delta_xk, delta_vk = localsolver.solve(v, Akxk, xk)
+        delta_vk = np.asarray(delta_v)
         # update local variables
-        xk += gamma * np.asarray(delta_x)
-        Akxk += gamma * delta_v
+        xk += gamma * np.asarray(delta_xk)
+        Akxk += gamma * delta_vk
 
         # update shared variables
-        update = MPI.COMM_WORLD.reduce(delta_v, op=MPI.SUM)
+        delta_v = np.zeros_like(delta_vk)
+        MPI.COMM_WORLD.Allreduce(delta_vk, delta_v, op=MPI.SUM)
         # assert (delta_v != old).any()
-        v += gamma * update
+        v += gamma * delta_v
 
-        if monitor.log(v, v, xk, i_iter, localsolver):
+        if monitor.log(v, Akxk, xk, i_iter, localsolver):
             print('break iterations here.')
             # break
 
