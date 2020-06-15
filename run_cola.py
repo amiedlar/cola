@@ -9,6 +9,8 @@ from cola.cocoasolvers import configure_solver
 from cola.algo import run_algorithm
 from cola.monitor import Monitor
 
+import os
+
 # import pyximport
 # pyximport.install() 
 
@@ -70,7 +72,6 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
     if algoritmname != 'cola':
         output_dir = os.path.join(output_dir, algoritmname)
     if dataset:
-        import os
         output_dir = os.path.join(output_dir, dataset)
     monitor = Monitor(solver, output_dir, ckpt_freq,
                       exit_time, split_by, logmode)
