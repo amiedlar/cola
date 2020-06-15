@@ -59,7 +59,7 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
 
     if use_split_dataset:
         if not dataset_path:
-            dataset_path = os.path.join('data', dataset, split_by, world_size)
+            dataset_path = os.path.join('data', dataset, split_by, f'{world_size}')
         X, y = load_dataset_by_rank(dataset, rank, world_size, dataset_size, datapoints, split_by,
                                     dataset_path=dataset_path, random_state=random_state)
     else:
