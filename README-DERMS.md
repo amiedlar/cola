@@ -10,7 +10,7 @@ To run cola:
 ```
 export JOBLIB_CACHE_DIR='./cache'
 export OUTPUT_DIR='./log'
-RDERMS_DATASET_PATH='./data/rderms/features/'$world_size
+DATASET_PATH='./data/rderms/features/'$world_size
 
 mpirun -n $world_size --oversubscribe python3 run_cola.py \
     --split_by 'features' \
@@ -24,7 +24,7 @@ mpirun -n $world_size --oversubscribe python3 run_cola.py \
     --output_dir ${OUTPUT_DIR} \
     --dataset_size 'all' \
     --ckpt_freq 2 \
-    --dataset_path ${RDERMS_DATASET_PATH} \
+    --dataset_path ${DATASET_PATH} \
     --solvername ElasticNet \
     --algoritmname cola \
     --use_split_dataset

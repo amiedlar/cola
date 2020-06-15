@@ -159,7 +159,7 @@ class ElasticNet(CoCoASubproblemSolver):
             def conjugate(x):
                 return self.B * np.sum(np.clip(np.abs(x) - 1, 0, np.inf))
 
-        c = self.lambda_ * len(self.y)
+        c = self.lambda_ * len(self.y) if self.lambda_ > 0 else len(self.y)
         return c * conjugate(x / c)
 
     @property
@@ -170,7 +170,7 @@ class ElasticNet(CoCoASubproblemSolver):
         super(ElasticNet, self).dist_init(Ak, y, theta, local_iters, sigma)
 
         # This constant is used to compute conjugate of modified L1 norm
-        self.B = self.f(np.zeros(len(self.y))) / self.lambda_
+        self.B = self.f(np.zeros(len(self.y))) / self.lambda_ if self.lambda_ > 0 else self.f(np.zeros(len(self.y)))
 
     def load_approximate_solver(self, sigma, local_iters, theta):
         """Load approximate solver to solve the standized problem."""
