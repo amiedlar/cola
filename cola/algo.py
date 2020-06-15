@@ -104,9 +104,8 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
     for i_iter in range(1, 1 + global_iters):
         # Solve the suproblem using this estimates
         delta_xk, delta_vk = localsolver.solve(v, Akxk, xk)
-        delta_vk = np.asarray(delta_v)
         # update local variables
-        xk += gamma * np.asarray(delta_xk)
+        xk += gamma * delta_xk
         Akxk += gamma * delta_vk
 
         # update shared variables
