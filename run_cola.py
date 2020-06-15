@@ -67,6 +67,8 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
                               lambda_=lambda_, C=c, random_state=random_state)
 
     # Add hooks to log and save metrics.
+    if algoritmname != 'cola':
+        output_dir = os.path.join(output_dir, algoritmname)
     if dataset:
         import os
         output_dir = os.path.join(output_dir, dataset)
