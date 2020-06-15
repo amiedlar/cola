@@ -49,7 +49,8 @@ class Monitor(object):
         self.records_g = []
         self.mode = mode
         self.ckpt_freq = ckpt_freq
-        os.makedirs(output_dir, exist_ok=True)
+        self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)
 
         # If a problem is split by samples, then the total number of data points is unknown
         # in a local node. As a result, we will defer the division to the logging time.
