@@ -74,7 +74,7 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
     if algoritmname != 'cola':
         output_dir = os.path.join(output_dir, algoritmname)
     if dataset:
-        output_dir = os.path.join(output_dir, dataset)
+        output_dir = os.path.join(output_dir, dataset, f'{world_size}/')
     monitor = Monitor(solver, output_dir, ckpt_freq,
                       exit_time, split_by, logmode)
 

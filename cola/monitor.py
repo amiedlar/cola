@@ -49,7 +49,6 @@ class Monitor(object):
         self.records_g = []
         self.mode = mode
         self.ckpt_freq = ckpt_freq
-        self.output_dir = os.path.join(output_dir, f'{comm.get_world_size()}')
         os.makedirs(output_dir, exist_ok=True)
 
         # If a problem is split by samples, then the total number of data points is unknown
