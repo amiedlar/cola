@@ -141,9 +141,7 @@ class ElasticNet(CoCoASubproblemSolver):
 
     def f_conj(self, w):
         w = np.asarray(w)
-        if self.lambda_ > 0:
-            return np.linalg.norm(w, 2) ** 2 / 2 + w @ self.y
-        return self.lambda_*np.linalg.norm(w, 2) ** 2 / 2 + w @ self.y
+        return np.linalg.norm(w, 2) ** 2 / 2 + w @ self.y
 
     def gk_conj(self, w):
         """
@@ -152,18 +150,15 @@ class ElasticNet(CoCoASubproblemSolver):
         """
         w = np.asarray(w)
         x = - w @ self.Ak
-        if self.lambda_ > 0:
-            if self.l1_ratio < 1.0:
-                # Conjugate of ElasticNet (0 <= l1_ratio < 1)
-                def conjugate(x):
-                    return np.sum(np.clip(np.abs(x) - self.l1_ratio, 0, np.inf) ** 2 / 2 / (1 - self.l1_ratio))
-            else:
-                # Lasso
-                def conjugate(x):
-                    return self.B * np.sum(np.clip(np.abs(x) - 1, 0, np.inf))
-        else:
+        if self.l1_ratio < 1.0:
+            # Conjugate of ElasticNet (0 <= l1_ratio < 1)
             def conjugate(x):
-                return self.f(x)
+                return np.sum(np.clip(np.abs(x) - self.l1_ratio, 0, np.inf) ** 2 / 2 / (1 - self.l1_ratio))
+        else:
+            # Lasso
+            def conjugate(x):
+                return self.B * np.sum(np.clip(np.abs(x) - 1, 0, np.inf))
+
         c = self.lambda_ * len(self.y) if self.lambda_ > 0 else len(self.y)
         return c * conjugate(x / c)
 
