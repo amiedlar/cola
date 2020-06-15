@@ -160,7 +160,7 @@ class Monitor(object):
         if logname:
             if self.mode == 'all':
                 self.records = self.records_g
-                logfile = os.path.join(self.output_dir, f'{rank}'+logname)
+                logfile = os.path.join(self.output_dir, f'{comm.get_world_size()}', f'{rank}'+logname)
                 pd.DataFrame(self.records_l).to_csv(logfile)
                 print("Data has been save to {} on node {}".format(logfile, rank))
             if rank == 0:
@@ -186,6 +186,6 @@ class Monitor(object):
                 weight = comm.reduce(weight, root=0, op='SUM')
 
             if rank == 0:
-                weightfile = os.path.join(self.output_dir, weightname)
+                weightfile = os.path.join(self.output_dir, f'{comm.get_world_size()}', weightname)
                 weight.dump(weightfile)
                 print("Weight has been save to {} on node 0".format(weightfile))
