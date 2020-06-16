@@ -234,7 +234,7 @@ class ElasticNet(CoCoASubproblemSolver):
 
     def standize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
-        return v - self.tau / self.sigma * w
+        return v - 1 / self.sigma * w
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
