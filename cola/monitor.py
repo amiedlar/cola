@@ -122,6 +122,7 @@ class Monitor(object):
             v = comm.all_reduce(np.array(Akxk), op='SUM')
         w = self.solver.grad_f(v)
 
+        record['res'] = float(np.linalg.norm(v - self.solver.y)/np.linalg.norm(self.solver.y))
         # Compute squared norm of consensus violation
         record['cv2'] = float(np.linalg.norm(vk - v, 2) ** 2)
         # Compute the value of minimizer objective
@@ -156,7 +157,7 @@ class Monitor(object):
         self.records.append(record)
 
         if self.rank == 0:
-            print("Iter {i_iter:5}, Time {time:10.5e}: gap={gap:10.3e}, P={P:10.3e}, D={D:10.3e}, f={f:10.3e}, "
+            print("Iter {i_iter:5}, Time {time:10.5e}: res={res:10.3e}, gap={gap:10.3e}, P={P:10.3e}, D={D:10.3e}, f={f:10.3e}, "
                   "g={g:10.3e}, f_conj={f_conj:10.3e}, g_conj={g_conj:10.3e}".format(**record))
 
     def save(self, Akxk, xk, weightname=None, logname=None):

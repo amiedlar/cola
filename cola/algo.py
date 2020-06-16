@@ -102,7 +102,7 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
     monitor.log(np.zeros(n_rows), v, xk, 0, localsolver)
     for i_iter in range(1, 1 + global_iters):
         # Solve the suproblem using this estimates
-        delta_xk, delta_vk = localsolver.solve(v, v, xk)
+        delta_xk, delta_vk = localsolver.solve(v, Ak*xk, xk)
         # update local variables
         xk += gamma * delta_xk
 
@@ -112,7 +112,7 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
         # assert (delta_v != old).any()
         v += gamma * delta_v
 
-        if monitor.log(v, v, xk, i_iter, localsolver):
+        if monitor.log(v, Ak*xk, xk, i_iter, localsolver):
             print('break iterations here.')
             # break
 

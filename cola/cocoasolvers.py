@@ -126,7 +126,7 @@ class LinearRegression(CoCoASubproblemSolver):
 
     def f_conj(self, w):
         w = np.asarray(w)
-        return np.linalg.norm(w, 2) ** 2 / 2 + w @ self.y
+        return np.linalg.norm(w, 2) ** 2 / 2 #+ w @ self.y
 
     def gk_conj(self, w):
         """
