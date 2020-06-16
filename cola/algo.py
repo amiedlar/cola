@@ -93,7 +93,6 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
 
     # Initialize
     xk = np.zeros(n_cols)
-    Akxk = np.zeros(n_rows)
     v = np.zeros(n_rows)
 
     sigma = gamma * K
@@ -103,10 +102,9 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
     monitor.log(np.zeros(n_rows), v, xk, 0, localsolver)
     for i_iter in range(1, 1 + global_iters):
         # Solve the suproblem using this estimates
-        delta_xk, delta_vk = localsolver.solve(v, Akxk, xk)
+        delta_xk, delta_vk = localsolver.solve(v, v, xk)
         # update local variables
         xk += gamma * delta_xk
-        Akxk += gamma * delta_vk
 
         # update shared variables
         delta_v = np.zeros_like(delta_vk)
@@ -114,11 +112,11 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
         # assert (delta_v != old).any()
         v += gamma * delta_v
 
-        if monitor.log(v, Akxk, xk, i_iter, localsolver):
+        if monitor.log(v, v, xk, i_iter, localsolver):
             print('break iterations here.')
             # break
 
         if (i_iter % monitor.ckpt_freq) == 0:
-            monitor.save(Akxk, xk, weightname='weight_epoch_{}.npy'.format(i_iter))
+            monitor.save(v, xk, weightname='weight_epoch_{}.npy'.format(i_iter))
 
-    return Akxk, xk
+    return v, xk

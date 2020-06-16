@@ -76,7 +76,7 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
     if dataset:
         output_dir = os.path.join(output_dir, dataset, f'{world_size}/')
     monitor = Monitor(solver, output_dir, ckpt_freq,
-                      exit_time, split_by, logmode)
+                      exit_time, split_by, logmode, algoritmname)
 
     # Always use this value throughout this project
     Akxk, xk = run_algorithm(algoritmname, X, y, solver, gamma, theta,
