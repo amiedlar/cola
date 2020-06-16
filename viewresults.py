@@ -39,7 +39,7 @@ def plot_local_results(n_nodes, local, x_axis='i_iter', x_label='global iteratio
     plt.xlabel(x_label)
     plt.ylabel('$\log_{10} (local\ gap)$')
     for i in range(n_nodes):
-        plt.plot(comp_data[i][x_axis], comp_data[i]['local_gap'], label=f'node {i}')
+        plt.plot(comp_data[i][x_axis], np.log10(comp_data[i]['local_gap']), label=f'node {i}')
     
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
@@ -79,7 +79,7 @@ def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     plt.ylabel('$\log_{10}(global\ gap)$')
     plt.plot(data[x_axis], np.log10(np.abs(data['gap'])), label='CoLA')
     if comp_data is not None:
-        plt.plot(comp_data[x_axis], np.log10(np.abs(data['gap'])), label='CoCoA')
+        plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['gap'])), label='CoCoA')
 
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
