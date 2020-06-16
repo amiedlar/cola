@@ -16,7 +16,7 @@ class Monitor(object):
     * save weight file and log files if specified;
     """
 
-    def __init__(self, solver, output_dir, ckpt_freq, exit_time=None, split_by='samples', mode='local'):
+    def __init__(self, solver, output_dir, ckpt_freq, exit_time=None, split_by='samples', mode='local', alg='cola'):
         """
         Parameters
         ----------
@@ -37,6 +37,8 @@ class Monitor(object):
         assert isinstance(solver, CoCoASubproblemSolver)
         self.rank = comm.get_rank()
         self.world_size = comm.get_world_size()
+
+        self.alg = alg
 
         self.solver = solver
 
@@ -115,7 +117,9 @@ class Monitor(object):
         record['time'] = self.running_time
 
         # v := A x
-        v = comm.all_reduce(np.array(Akxk), op='SUM')
+        v = vk
+        if self.alg == 'cola':
+            v = comm.all_reduce(np.array(Akxk), op='SUM')
         w = self.solver.grad_f(v)
 
         # Compute squared norm of consensus violation

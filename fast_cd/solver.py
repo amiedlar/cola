@@ -91,7 +91,7 @@ class LeastSquaresCoordSolver(object):
             model = sparse_lsqr(X, y, iter_lim=self.max_iter, atol=self.tol, btol=self.tol, x0=coef_)
         else:
             model = dense_lsqr(X, y)
-        coef_, gap_, eps_, n_iter_ = model
+        coef_, eps_, n_iter_, gap_, etc = model
 
         self.coef_ = np.asarray(coef_, dtype=X.dtype)
         self.gap_ = gap_
