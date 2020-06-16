@@ -53,6 +53,50 @@ class SVMCoordSolver(object):
         self.n_iter_ = n_iter_
         return self
 
+class LeastSquaresCoordSolver(object):
+    """
+            
+    """
+    # The duality gap computed in the pyx file use the dual variable
+    #       w = ratio * grad f(v)
+    # where the ratio is chosen such that the dual of elastic net regularizer is 0.
+
+    def __init__(self, max_iter=1.0, tol=1e-4, warm_start=True):
+        self.max_iter = float(max_iter)
+        self.tol = tol
+        self.warm_start = warm_start
+
+    def fit(self, X, y, check_input=True):
+        assert y.ndim == 1
+
+        n_samples, n_features = X.shape
+        n_targets = 1
+
+        if check_input:
+            X, y = check_X_y(X, y, accept_sparse='csc', order='F', dtype=[np.float32, np.float64],
+                             copy=True, multi_output=True, y_numeric=True)
+            y = check_array(y, order='F', copy=True, dtype=X.dtype.type, ensure_2d=False)
+
+        if not self.warm_start or not hasattr(self, "coef_"):
+            coef_ = np.zeros(n_features, dtype=X.dtype, order='F')
+        else:
+            coef_ = self.coef_
+
+        # Computation
+        coef_ = np.asfortranarray(coef_, dtype=X.dtype)
+        y = y.astype(X.dtype)
+        from scipy.sparse.linalg import lsqr as sparse_lsqr
+        from scipy.linalg import lstsq as dense_lsqr
+        if sparse.isspmatrix(X):
+            model = sparse_lsqr(X, y, iter_lim=self.max_iter, atol=self.tol, btol=self.tol, x0=coef_)
+        else:
+            model = dense_lsqr(X, y)
+        coef_, gap_, eps_, n_iter_ = model
+
+        self.coef_ = np.asarray(coef_, dtype=X.dtype)
+        self.gap_ = gap_
+        self.n_iter_ = n_iter_
+        return self
 
 class ElasticNetCoordSolver(object):
     """

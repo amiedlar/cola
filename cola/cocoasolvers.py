@@ -108,6 +108,55 @@ class CoCoASubproblemSolver(metaclass=ABCMeta):
 
         return delta_xk, delta_Akxk
 
+class LinearRegression(CoCoASubproblemSolver):
+    """Least Squares linear regression"""
+    def __init__(self):
+        super(LinearRegression, self).__init__()
+
+    def grad_f(self, v):
+        v = np.asarray(v)
+        return (v - self.y)
+
+    def f(self, v):
+        v = np.asarray(v)
+        return np.linalg.norm(self.y - v) ** 2 / 2
+
+    def gk(self, xk):
+        return 0
+
+    def f_conj(self, w):
+        w = np.asarray(w)
+        return np.linalg.norm(w, 2) ** 2 / 2 #+ w @ self.y
+
+    def gk_conj(self, w):
+        """
+        Conjugate of Regularizer use Lemma 6 and Lemma 7 in 
+            L1-Regularized Distributed Optimization- A Communication-Efficient Primal-Dual Framework
+        """
+        w = np.asarray(w)
+        x = - w @ self.Ak
+        return 0
+
+    @property
+    def solver_coef(self):
+        return self.solver.coef_
+
+    def dist_init(self, Ak, y, theta, local_iters, sigma):
+        super(LinearRegression, self).dist_init(Ak, y, theta, local_iters, sigma)
+        
+    def load_approximate_solver(self, sigma, local_iters, theta):
+        """Load approximate solver to solve the standized problem."""
+        from fast_cd.solver import LeastSquaresCoordSolver
+        self.solver = LeastSquaresCoordSolver(max_iter=local_iters,tol=theta, warm_start=True)
+
+    def standize_subproblem(self, v, w):
+        """Convert subproblem to a standard form so that local solver can solve."""
+        return v - self.tau / self.sigma * w
+
+    def recover_solution(self):
+        """From the standardized solution to original solution."""
+        return self.solver.coef_
+
 
 class ElasticNet(CoCoASubproblemSolver):
     """
@@ -141,7 +190,7 @@ class ElasticNet(CoCoASubproblemSolver):
 
     def f_conj(self, w):
         w = np.asarray(w)
-        return np.linalg.norm(w, 2) ** 2 / 2 #+ w @ self.y
+        return np.linalg.norm(w, 2) ** 2 / 2 + w @ self.y
 
     def gk_conj(self, w):
         """
@@ -379,6 +428,9 @@ def configure_solver(name, random_state, split_by, **params):
         assert split_by == 'features', 'This solver only works for splitting by features'
         solver = LogisticRegression(lambda_=params['lambda_'], l1_ratio=params['l1_ratio'],
                                     random_state=random_state)
+    elif name == 'LinearRegression':
+        assert split_by == 'features'
+        solver = LinearRegression()
     else:
         raise NotImplementedError
     return solver
