@@ -151,7 +151,7 @@ class LinearRegression(CoCoASubproblemSolver):
 
     def standize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
-        return v - self.tau / self.sigma * w
+        return v - 1/self.sigma * w
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
@@ -190,7 +190,7 @@ class ElasticNet(CoCoASubproblemSolver):
 
     def f_conj(self, w):
         w = np.asarray(w)
-        return np.linalg.norm(w, 2) ** 2 / 2 + w @ self.y
+        return np.linalg.norm(w, 2) ** 2 / 2 #+ w @ self.y
 
     def gk_conj(self, w):
         """
@@ -234,7 +234,7 @@ class ElasticNet(CoCoASubproblemSolver):
 
     def standize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
-        return v - 1 / self.sigma * w
+        return v - self.tau / self.sigma * w
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
