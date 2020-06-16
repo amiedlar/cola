@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import numpy as np
 import pandas as pd
+import os
 
 def print_final_weights():
     w = np.load('log/weight.npy', allow_pickle=True)
@@ -15,7 +16,7 @@ def print_final_weights():
         k+=1
 
 def plot_local_results(n_nodes, local, x_axis='i_iter', x_label='global iteration step', comp_data=None):
-    plt.figure(f'Local Results, {n_nodes} nodes')
+    fig = plt.figure(f'Local Results, {n_nodes} nodes')
     if comp_data is None:
         plt.subplot(111)
         plt.title('Gap')
@@ -44,7 +45,9 @@ def plot_local_results(n_nodes, local, x_axis='i_iter', x_label='global iteratio
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
+    fig.tight_layout()
     plt.show()
+    return fig
 
 def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
     # Plot primal and dual
@@ -84,10 +87,12 @@ def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
+    fig.tight_layout()
     plt.show()
+    return fig
 
 def plot_primal_dual(n_nodes, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
-    plt.figure(f'Primal and Dual Values, {n_nodes} nodes')
+    fig = plt.figure(f'Primal and Dual Values, {n_nodes} nodes')
     plt.subplot(121)
     plt.title('Primal')
     plt.xlabel(x_label)
@@ -100,10 +105,12 @@ def plot_primal_dual(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     plt.ylabel('$\mathcal{D}(x)$')
     plt.plot(data[x_axis], data['D'])
 
+    fig.tight_layout()
     plt.show()
+    return fig
 
 def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
-    plt.figure(f'Minimizer Values, {n_nodes} nodes')
+    fig = plt.figure(f'Minimizer Values, {n_nodes} nodes')
     plt.title('Minimizer functions per iteration')
     plt.subplot(221)
     plt.xlabel(x_label)
@@ -145,44 +152,55 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
+    fig.tight_layout()
     plt.show()
+    return fig
 
 @click.command()
 @click.option('--n_nodes', type=click.INT, default=None, help='Number of mpi processes')
 @click.option('--logdir', type=click.STRING, default='log', help='root directory of output files')
 @click.option('--dataset', type=click.STRING, default='rderms', help='dataset name')
 @click.option('--compare', is_flag=True)
-def plot_results(n_nodes, logdir, dataset, compare):
-    from os.path import join
-    log_path = join(logdir, dataset) 
-    comp_path = join(logdir, 'cocoa', dataset)
+@click.option('--savedir', type=click.STRING, default=None)
+def plot_results(n_nodes, logdir, dataset, compare, savedir):
+    log_path = os.path.join(logdir, dataset) 
+    comp_path = os.path.join(logdir, 'cocoa', dataset)
     local_results = []
     if not n_nodes:
         n_nodes = 1
-        import os.path as path
         while True:
-            next_dir = join(log_path, f'{n_nodes}')
-            if path.exists(next_dir):
+            next_dir = os.path.join(log_path, f'{n_nodes}')
+            if os.path.exists(next_dir):
                 break
             n_nodes+=1
             if n_nodes>256:
                 Exception('No logs found.')
     
-    log_path = join(log_path, f'{n_nodes}')
-    comp_path = join(comp_path, f'{n_nodes}')
+    log_path = os.path.join(log_path, f'{n_nodes}')
+    comp_path = os.path.join(comp_path, f'{n_nodes}')
     assert n_nodes is not None and n_nodes>0, 'logs not found, try specifying `logdir` and `n_nodes`' 
     
-    local_results = [pd.read_csv(join(log_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
-    global_results = pd.read_csv(join(log_path, 'result.csv')).loc[1:]
+    local_results = [pd.read_csv(os.path.join(log_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
+    global_results = pd.read_csv(os.path.join(log_path, 'result.csv')).loc[1:]
     comp_local = None 
     comp_global = None 
     if compare:
-        comp_local = [pd.read_csv(join(comp_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
-        comp_global = pd.read_csv(join(comp_path, 'result.csv')).loc[1:]
+        comp_local = [pd.read_csv(os.path.join(comp_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
+        comp_global = pd.read_csv(os.path.join(comp_path, 'result.csv')).loc[1:]
     
-    plot_local_results(n_nodes, local_results, x_label='Iteration Count', comp_data=comp_local)
-    plot_minimizers(n_nodes, global_results, x_label='Iteration Count', comp_data=comp_global)
-    plot_duality_gap(n_nodes, global_results, x_label='Iteration Count', comp_data=comp_global)
+    fig = plot_local_results(n_nodes, local_results, x_label='Iteration Count', comp_data=comp_local)
+    if savedir is not None:
+        savedir = os.path.join(savedir, dataset, f'{n_nodes}')
+        os.makedirs(savedir, exist_ok=True)
+        fig.savefig(os.path.join(savedir, 'local.pdf'), dpi=150)
+
+    fig = plot_minimizers(n_nodes, global_results, x_label='Iteration Count', comp_data=comp_global)
+    if savedir is not None:
+        fig.savefig(os.path.join(savedir, 'minimizers.pdf'), dpi=150)
+
+    fig = plot_duality_gap(n_nodes, global_results, x_label='Iteration Count', comp_data=comp_global)
+    if savedir is not None:
+        fig.savefig(os.path.join(savedir, 'duality-gap.pdf'), dpi=150)
     
 if __name__ == '__main__':
     plot_results()
