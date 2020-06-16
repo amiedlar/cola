@@ -165,6 +165,9 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
 def plot_results(n_nodes, logdir, dataset, compare, savedir):
     log_path = os.path.join(logdir, dataset) 
     comp_path = os.path.join(logdir, 'cocoa', dataset)
+    if not os.path.exists(log_path):
+        print(f"Log directory not found at '{log_path}'")
+        exit(1)
     local_results = []
     if not n_nodes:
         n_nodes = 1
@@ -174,7 +177,8 @@ def plot_results(n_nodes, logdir, dataset, compare, savedir):
                 break
             n_nodes+=1
             if n_nodes>256:
-                Exception('No logs found.')
+                print('No logs found in directory.')
+                exit(1)
     
     log_path = os.path.join(log_path, f'{n_nodes}')
     comp_path = os.path.join(comp_path, f'{n_nodes}')
