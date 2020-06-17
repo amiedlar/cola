@@ -26,7 +26,7 @@ class SVMCoordSolver(object):
             return self.coef_
         return None
 
-    @property.setter
+    @coef.setter
     def coef(self, coef_):
         self.coef_ = coef_
 
@@ -88,7 +88,7 @@ class LeastSquaresCoordSolver(object):
             return self.coef_
         return None
 
-    @property.setter
+    @coef.setter
     def coef(self, coef_):
         self.coef_ = coef_
 
@@ -149,7 +149,7 @@ class ElasticNetCoordSolver(object):
             return self.coef_
         return None
 
-    @property.setter
+    @coef.setter
     def coef(self, coef_):
         self.coef_ = coef_
 
@@ -218,7 +218,7 @@ class DADMMElasticNetCoordSolver(object):
             return self.coef_
         return None
 
-    @property.setter
+    @coef.setter
     def coef(self, coef_):
         self.coef_ = coef_
 
