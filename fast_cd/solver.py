@@ -20,6 +20,22 @@ class SVMCoordSolver(object):
         self.random_state = random_state
         self.rng = check_random_state(self.random_state)
 
+    @property
+    def coef(self):
+        if hasattr(self, 'coef_'):
+            return self.coef_
+        return None
+
+    @property.setter
+    def coef(self, coef_):
+        self.coef_ = coef_
+
+    @property
+    def dual_coef(self):
+        if hasattr(self, 'dual_coef_'):
+            return self.dual_coef_
+        return None
+
     def fit(self, X, y, b, check_input=True):
         assert y.ndim == 1
         n_samples, n_features = X.shape
@@ -31,10 +47,10 @@ class SVMCoordSolver(object):
             y = check_array(y, order='F', copy=True, dtype=X.dtype.type, ensure_2d=False)
             b = check_array(b, order='F', copy=True, dtype=X.dtype.type, ensure_2d=False)
 
-        if not self.warm_start or not hasattr(self, "dual_coef_"):
+        if not self.warm_start or self.dual_coef is None:
             dual_coef_ = np.zeros(n_samples, dtype=X.dtype, order='F')
         else:
-            dual_coef_ = self.dual_coef_
+            dual_coef_ = self.dual_coef
 
         # Computation
         dual_coef_ = np.asfortranarray(dual_coef_, dtype=X.dtype)
@@ -66,6 +82,16 @@ class LeastSquaresCoordSolver(object):
         self.tol = tol
         self.warm_start = warm_start
 
+    @property
+    def coef(self):
+        if hasattr(self, 'coef_'):
+            return self.coef_
+        return None
+
+    @property.setter
+    def coef(self, coef_):
+        self.coef_ = coef_
+
     def fit(self, X, y, check_input=True):
         assert y.ndim == 1
 
@@ -77,7 +103,7 @@ class LeastSquaresCoordSolver(object):
                              copy=True, multi_output=True, y_numeric=True)
             y = check_array(y, order='F', copy=True, dtype=X.dtype.type, ensure_2d=False)
 
-        if not self.warm_start or not hasattr(self, "coef_"):
+        if not self.warm_start or self.coef is None:
             coef_ = np.zeros(n_features, dtype=X.dtype, order='F')
         else:
             coef_ = self.coef_
@@ -117,6 +143,16 @@ class ElasticNetCoordSolver(object):
         self.random_state = random_state
         self.rng = check_random_state(self.random_state)
 
+    @property
+    def coef(self):
+        if hasattr(self, 'coef_'):
+            return self.coef_
+        return None
+
+    @property.setter
+    def coef(self, coef_):
+        self.coef_ = coef_
+
     def fit(self, X, y, check_input=True):
         assert y.ndim == 1
 
@@ -128,10 +164,10 @@ class ElasticNetCoordSolver(object):
                              copy=True, multi_output=True, y_numeric=True)
             y = check_array(y, order='F', copy=True, dtype=X.dtype.type, ensure_2d=False)
 
-        if not self.warm_start or not hasattr(self, "coef_"):
+        if not self.warm_start or self.coef is None:
             coef_ = np.zeros(n_features, dtype=X.dtype, order='F')
         else:
-            coef_ = self.coef_
+            coef_ = self.coef
 
         alpha = self.lambda_ * self.l1_ratio * len(y)
         beta = self.lambda_ * (1 - self.l1_ratio) * len(y)
@@ -176,6 +212,16 @@ class DADMMElasticNetCoordSolver(object):
         self.random_state = random_state
         self.rng = check_random_state(self.random_state)
 
+    @property
+    def coef(self):
+        if hasattr(self, 'coef_'):
+            return self.coef_
+        return None
+
+    @property.setter
+    def coef(self, coef_):
+        self.coef_ = coef_
+
     def fit(self, X, y, c, check_input=True):
         assert y.ndim == 1
 
@@ -187,10 +233,10 @@ class DADMMElasticNetCoordSolver(object):
                              copy=True, multi_output=True, y_numeric=True)
             y = check_array(y, order='F', copy=True, dtype=X.dtype.type, ensure_2d=False)
 
-        if not self.warm_start or not hasattr(self, "coef_"):
+        if not self.warm_start or self.coef is None:
             coef_ = np.zeros(n_features, dtype=X.dtype, order='F')
         else:
-            coef_ = self.coef_
+            coef_ = self.coef
 
         alpha = self.lambda_ * self.l1_ratio * len(y)
         beta = self.lambda_ * (1 - self.l1_ratio) * len(y) + 2 * self.rho * self.n_neighbor

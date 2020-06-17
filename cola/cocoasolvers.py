@@ -94,7 +94,7 @@ class CoCoASubproblemSolver(metaclass=ABCMeta):
         # Transform to the standardized subproblem
         self.subproblem_y = self.standize_subproblem(Akxk, w)
 
-        self.solver.coef_ = xk.copy()
+        self.solver.coef = xk.copy()
 
         # Solve subproblem
         self.solver.fit(self.Ak, self.subproblem_y, check_input=False)
@@ -135,11 +135,13 @@ class LinearRegression(CoCoASubproblemSolver):
         """
         w = np.asarray(w)
         x = - w @ self.Ak
+        if self.solver_coef is None:
+            return 0
         return x @ self.solver_coef
 
     @property
     def solver_coef(self):
-        return self.solver.coef_
+        return self.solver.coef
 
     def dist_init(self, Ak, y, theta, local_iters, sigma):
         super(LinearRegression, self).dist_init(Ak, y, theta, local_iters, sigma)
@@ -156,7 +158,7 @@ class LinearRegression(CoCoASubproblemSolver):
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
-        return self.solver.coef_
+        return self.solver.coef
 
 
 class ElasticNet(CoCoASubproblemSolver):
@@ -214,7 +216,7 @@ class ElasticNet(CoCoASubproblemSolver):
 
     @property
     def solver_coef(self):
-        return self.solver.coef_
+        return self.solver.coef
 
     def dist_init(self, Ak, y, theta, local_iters, sigma):
         super(ElasticNet, self).dist_init(Ak, y, theta, local_iters, sigma)
@@ -239,7 +241,7 @@ class ElasticNet(CoCoASubproblemSolver):
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
-        return self.solver.coef_
+        return self.solver.coef
 
 
 class LogisticRegression(CoCoASubproblemSolver):
@@ -300,7 +302,7 @@ class LogisticRegression(CoCoASubproblemSolver):
 
     @property
     def solver_coef(self):
-        return self.solver.coef_
+        return self.solver.coef
 
     def dist_init(self, Ak, y, theta, local_iters, sigma):
         super(LogisticRegression, self).dist_init(Ak, y, theta, local_iters, sigma)
@@ -325,7 +327,7 @@ class LogisticRegression(CoCoASubproblemSolver):
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
-        return self.solver.coef_
+        return self.solver.coef
 
 
 class LinearSVM(CoCoASubproblemSolver):
@@ -369,7 +371,7 @@ class LinearSVM(CoCoASubproblemSolver):
 
     @property
     def solver_coef(self):
-        return self.solver.dual_coef_
+        return self.solver.dual_coef
 
     def load_approximate_solver(self, sigma, local_iters, theta):
         """Load approximate solver to solve the standized problem."""
@@ -388,7 +390,7 @@ class LinearSVM(CoCoASubproblemSolver):
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
-        return self.solver.dual_coef_
+        return self.solver.dual_coef
 
     def solve(self, v, Akxk, xk):
         # Standarize data
@@ -402,7 +404,7 @@ class LinearSVM(CoCoASubproblemSolver):
         # Transform to the standardized subproblem
         self.subproblem_y = self.standize_subproblem(Akxk, w, Akxk)
 
-        self.solver.coef_ = xk.copy()
+        self.solver.coef = xk.copy()
 
         # Solve subproblem
         self.solver.fit(self.Ak.T, self.y, self.subproblem_y)
