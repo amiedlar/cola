@@ -151,7 +151,7 @@ class LinearRegression(CoCoASubproblemSolver):
 
     def standize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
-        return v - 1/self.sigma * w
+        return self.y # v  - 1/self.sigma * w
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
