@@ -135,7 +135,7 @@ class LinearRegression(CoCoASubproblemSolver):
         """
         w = np.asarray(w)
         x = - w @ self.Ak
-        return 0
+        return x @ self.solver_coef
 
     @property
     def solver_coef(self):
@@ -146,12 +146,13 @@ class LinearRegression(CoCoASubproblemSolver):
         
     def load_approximate_solver(self, sigma, local_iters, theta):
         """Load approximate solver to solve the standized problem."""
+        self._tau = 1
         from fast_cd.solver import LeastSquaresCoordSolver
         self.solver = LeastSquaresCoordSolver(max_iter=local_iters,tol=theta, warm_start=True)
 
     def standize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
-        return self.y # v  - 1/self.sigma * w
+        return v  - self.tau/self.sigma * w
 
     def recover_solution(self):
         """From the standardized solution to original solution."""
