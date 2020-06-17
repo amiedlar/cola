@@ -23,6 +23,35 @@ def print_weights(dataset, n_nodes, alg='cola', logpath='log', mode='final'):
         print(f'\tNode {k}: {w[k]}')
         k+=1
 
+def plot_residual(n_nodes, ref_weights, weights_path, niter, comp_weights_path=None):
+    ref_norm = np.linalg.norm(ref_weights)
+    res = [(i, np.linalg.norm(np.load(wf, allow_pickle=True) - ref_weights)/ref_norm) 
+        for (i, wf) in [(i, os.path.join(weights_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)] 
+        if os.path.exists(wf)]
+    comp_res=None
+    if comp_weights_path is not None:
+        comp_res = [(i, np.linalg.norm(np.load(wf, allow_pickle=True) - ref_weights)/ref_norm) \
+            for (i, wf) in [(i, os.path.join(comp_weights_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)]
+            if os.path.exists(wf)]
+    iters, res = zip(*res)
+    c_iters, comp_res = zip(*comp_res)
+    fig = plt.figure(f'Residuals, {n_nodes} nodes')
+   
+    plt.title('Residuals')
+    plt.xlabel('Iteration Count')
+    plt.ylabel('$\log_{10} (\|x_k - x\|/\|x\|)$')
+    plt.plot(iters, np.log10(res), label='CoLA')
+    if comp_res is not None:
+        plt.plot(c_iters, np.log10(comp_res), label='CoCoA')
+
+    leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
+    leg.get_frame().set_alpha(0.5)
+
+    fig.tight_layout()
+    plt.show()
+    return fig
+    
+
 def plot_local_results(n_nodes, local, x_axis='i_iter', x_label='global iteration step', comp_data=None):
     fig = plt.figure(f'Local Results, {n_nodes} nodes')
     if comp_data is None:
@@ -176,6 +205,9 @@ def plot_results(n_nodes, logdir, dataset, compare, savedir):
     if not os.path.exists(log_path):
         print(f"Log directory not found at '{log_path}'")
         exit(1)
+    if compare and not os.path.exists(comp_path):
+        print(f"Log directory not found at '{comp_path}'")
+        exit(1)
     local_results = []
     if not n_nodes:
         n_nodes = 1
@@ -191,14 +223,20 @@ def plot_results(n_nodes, logdir, dataset, compare, savedir):
     log_path = os.path.join(log_path, f'{n_nodes}')
     comp_path = os.path.join(comp_path, f'{n_nodes}')
     assert n_nodes is not None and n_nodes>0, 'logs not found, try specifying `logdir` and `n_nodes`' 
+
+    reference_weight_path = os.path.join(logdir, dataset, 'final_weight.npy')
+    showres = os.path.exists(reference_weight_path)
     
     local_results = [pd.read_csv(os.path.join(log_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
     global_results = pd.read_csv(os.path.join(log_path, 'result.csv')).loc[1:]
     comp_local = None 
     comp_global = None 
+    
     if compare:
         comp_local = [pd.read_csv(os.path.join(comp_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
         comp_global = pd.read_csv(os.path.join(comp_path, 'result.csv')).loc[1:]
+    else:
+        comp_path = None
     
     fig = plot_local_results(n_nodes, local_results, x_label='Iteration Count', comp_data=comp_local)
     if savedir is not None:
@@ -213,6 +251,12 @@ def plot_results(n_nodes, logdir, dataset, compare, savedir):
     fig = plot_duality_gap(n_nodes, global_results, x_label='Iteration Count', comp_data=comp_global)
     if savedir is not None:
         fig.savefig(os.path.join(savedir, 'duality-gap.pdf'), dpi=150)
+
+    if showres:
+        ref_weight = np.load(reference_weight_path, allow_pickle=True)
+        fig = plot_residual(n_nodes, ref_weight, log_path, int(max(global_results['i_iter'])), comp_weights_path=comp_path)
+        if savedir is not None:
+            fig.savefig(os.path.join(savedir, 'duality-gap.pdf'), dpi=150) 
     
 if __name__ == '__main__':
     plot_results()

@@ -19,13 +19,13 @@ mpirun -n $world_size --oversubscribe python3 run_cola.py \
     --exit_time 1000.0 \
     --logmode='all' \
     --theta 1e-7 \
-    --l1_ratio 0.5 \
-    --lambda_ 1e-4 \
+    --l1_ratio 0 \
+    --lambda_ 0 \
     --output_dir ${OUTPUT_DIR} \
     --dataset_size 'all' \
     --ckpt_freq 2 \
-    --dataset_path ${DATASET_PATH} \
-    --solvername ElasticNet \
+    --dataset mg_scale \
+    --solvername LinearRegression \
     --algoritmname cola \
     --use_split_dataset
 ```
