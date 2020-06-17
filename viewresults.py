@@ -7,11 +7,15 @@ import numpy as np
 import pandas as pd
 import os
 
-def print_final_weights(dataset, n_nodes, alg='cola', logpath='log'):
+def print_weights(dataset, n_nodes, alg='cola', logpath='log', mode='final'):
     if alg == 'cola':
-        logpath = os.path.join(logpath, dataset, f'{n_nodes}', 'weight.npy')
+        logpath = os.path.join(logpath, dataset, f'{n_nodes}')
     else:
-        logpath = os.path.join(logpath, alg, dataset, n_nodes, 'weight.npy')
+        logpath = os.path.join(logpath, alg, dataset, n_nodes)
+    if mode == 'final':
+        logpath = os.path.join(logpath, 'weight.py')
+    else:
+        logpath = os.path.join(logpath, f'{mode}weight.py')
     w = np.load(logpath, allow_pickle=True)
     print('weights:')
     k=0

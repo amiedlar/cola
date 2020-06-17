@@ -187,7 +187,7 @@ class Monitor(object):
 
                 weight = np.zeros(sum(size))
                 weight[sum(size[:rank]): sum(size[:rank]) + len(xk)] = np.array(xk)
-                # print(f'node {rank} weights: {xk}')
+                print(f'node {rank} weights: {weight}')
                 weight = comm.reduce(weight, root=0, op='SUM')
 
             if rank == 0:
