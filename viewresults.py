@@ -256,7 +256,7 @@ def plot_results(n_nodes, logdir, dataset, compare, savedir):
         ref_weight = np.load(reference_weight_path, allow_pickle=True)
         fig = plot_residual(n_nodes, ref_weight, log_path, int(max(global_results['i_iter'])), comp_weights_path=comp_path)
         if savedir is not None:
-            fig.savefig(os.path.join(savedir, 'duality-gap.pdf'), dpi=150) 
+            fig.savefig(os.path.join(savedir, 'relative_error.pdf'), dpi=150) 
     
 if __name__ == '__main__':
     plot_results()

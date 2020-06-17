@@ -123,6 +123,8 @@ class Monitor(object):
         w = self.solver.grad_f(v)
 
         record['res'] = float(np.linalg.norm(v - self.solver.y)/np.linalg.norm(self.solver.y))
+        val_res2 = (-w @ self.solver.Ak) * xk
+        record['res2'] = comm.all_reduce(val_res2, 'SUM')
         # Compute squared norm of consensus violation
         record['cv2'] = float(np.linalg.norm(vk - v, 2) ** 2)
         # Compute the value of minimizer objective
