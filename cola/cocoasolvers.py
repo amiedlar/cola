@@ -134,7 +134,7 @@ class LinearRegression(CoCoASubproblemSolver):
             L1-Regularized Distributed Optimization- A Communication-Efficient Primal-Dual Framework
         """
         w = np.asarray(w)
-        x = - w @ self.Ak
+        x = w @ self.Ak
         if self.solver_coef is None:
             return 0
         return x @ self.solver_coef
