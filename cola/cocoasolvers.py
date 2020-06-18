@@ -137,7 +137,7 @@ class LinearRegression(CoCoASubproblemSolver):
         x = - w @ self.Ak
         if self.solver_coef is None:
             return 0
-        return 0#x @ self.solver_coef
+        return x @ self.solver_coef
 
     @property
     def solver_coef(self):
