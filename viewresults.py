@@ -34,7 +34,9 @@ def plot_residual(n_nodes, ref_weights, weights_path, niter, comp_weights_path=N
             for (i, wf) in [(i, os.path.join(comp_weights_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)]
             if os.path.exists(wf)]
     iters, res = zip(*res)
-    c_iters, comp_res = zip(*comp_res)
+    c_iters = None    
+    if comp_res is not None: 
+        c_iters, comp_res = zip(*comp_res)
     fig = plt.figure(f'Residuals, {n_nodes} nodes')
    
     plt.title('Residuals')
@@ -198,8 +200,11 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
 @click.option('--logdir', type=click.STRING, default='log', help='root directory of output files')
 @click.option('--dataset', type=click.STRING, default='rderms', help='dataset name')
 @click.option('--compare', is_flag=True)
+@click.option('--save', is_flag=True)
 @click.option('--savedir', type=click.STRING, default=None)
-def plot_results(n_nodes, logdir, dataset, compare, savedir):
+def plot_results(n_nodes, logdir, dataset, compare, save, savedir):
+    if save and savedir is None:
+        savedir = 'out'
     log_path = os.path.join(logdir, dataset) 
     comp_path = os.path.join(logdir, 'cocoa', dataset)
     if not os.path.exists(log_path):
