@@ -119,7 +119,6 @@ class LeastSquaresCoordSolver(object):
             model = dense_lsqr(X, y)
         coef_, eps_, n_iter_, gap_ = model[:4]
         from mpi4py import MPI
-        print(f'[{MPI.COMM_WORLD.rank}] Local term bc: {eps_}')
         self.coef_ = np.asarray(coef_, dtype=X.dtype)
         self.gap_ = gap_
         self.n_iter_ = n_iter_

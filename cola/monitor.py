@@ -2,6 +2,7 @@ import os
 import time
 import pandas as pd
 import numpy as np
+from numpy.linalg import norm
 # import torch
 # import torch.distributed as dist
 from .cocoasolvers import CoCoASubproblemSolver
@@ -85,6 +86,9 @@ class Monitor(object):
             self.records = self.records_g
             self._log_global(vk, Akxk, xk, i_iter, solver)
             self.records_g = self.records
+            print(f"[{comm.get_rank()}] Certificate, Iter {self.records[-1]['i_iter']}: "
+                  f"global_gap={self.records[-1]['gap']:10.5e}; "
+                  f"local_gap={self.records_l[-1]['cert_gap']:10.5e}, local_cv={self.records_l[-1]['cert_cv']:10.5e}")
         else:
             raise NotImplementedError("[local, global, all, None] are expected mode, got {}".format(self.mode))
 
@@ -106,10 +110,14 @@ class Monitor(object):
         except:
             record['local_gap'] = 0
             record['n_iter_'] = 0
-
+        K = comm.get_world_size()
+        wk = self.solver.grad_f(Akxk)
+        record['cert_gap'] = 2 * K * (Akxk @ wk)
+        L = 1/self.solver.theta
+        record['cert_cv'] = 2 * K**2 * np.sqrt(self.solver.theta) * L * norm(wk - self.solver.grad_f(vk), 2) 
         self.records.append(record)
 
-        print("Iter {i_iter:5}, Time {time:10.5e} local_gap {local_gap:10.5e} local_iters {n_iter_}".format(**record))
+        print("Iter {i_iter:5}, Time {time:10.5e}: cert_gap={cert_gap:10.5e}, cert_cv={}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
 
     def _log_global(self, vk, Akxk, xk, i_iter, solver):
         record = {}
@@ -122,14 +130,14 @@ class Monitor(object):
             v = comm.all_reduce(np.array(Akxk), op='SUM')
         w = self.solver.grad_f(v)
 
-        record['res'] = float(np.linalg.norm(v - self.solver.y)/np.linalg.norm(self.solver.y))
+        record['res'] = float(norm(v - self.solver.y)/norm(self.solver.y))
         val_res2 = (-w @ self.solver.Ak) * xk
         record['res2'] = comm.all_reduce(val_res2, 'SUM')
         # Compute squared norm of consensus violation
-        record['cv2'] = float(np.linalg.norm(vk - v, 2) ** 2)
+        record['cv2'] = float(norm(vk - v, 2) ** 2)
         # Compute the value of minimizer objective
-        record['mag_xk'] = np.linalg.norm(xk,2)
-        record['mag_v'] = float(np.linalg.norm(v,2) ** 2)
+        record['mag_xk'] = norm(xk,2)
+        record['mag_v'] = float(norm(v,2) ** 2)
         val_gk = self.solver.gk(xk)
         record['g'] = comm.all_reduce(val_gk, 'SUM')
         record['f'] = self.solver.f(v)
@@ -159,7 +167,7 @@ class Monitor(object):
         self.records.append(record)
 
         if self.rank == 0:
-            print("Iter {i_iter:5}, Time {time:10.5e}: res={res:10.3e}, gap={gap:10.3e}, P={P:10.3e}, D={D:10.3e}, f={f:10.3e}, "
+            print("Iter {i_iter:5}, Time {time:10.5e}: gap={gap:10.3e}, P={P:10.3e}, D={D:10.3e}, f={f:10.3e}, "
                   "g={g:10.3e}, f_conj={f_conj:10.3e}, g_conj={g_conj:10.3e}".format(**record))
 
     def save(self, Akxk, xk, weightname=None, logname=None):
@@ -189,7 +197,7 @@ class Monitor(object):
 
                 weight = np.zeros(sum(size))
                 weight[sum(size[:rank]): sum(size[:rank]) + len(xk)] = np.array(xk)
-                print(f'node {rank} weights: {weight}')
+                # print(f'node {rank} weights: {weight}')
                 weight = comm.reduce(weight, root=0, op='SUM')
 
             if rank == 0:
