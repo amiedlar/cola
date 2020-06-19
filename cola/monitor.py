@@ -117,7 +117,7 @@ class Monitor(object):
         record['cert_cv'] = 2 * K**2 * np.sqrt(self.solver.theta) * L * norm(wk - self.solver.grad_f(vk), 2) 
         self.records.append(record)
 
-        print("Iter {i_iter:5}, Time {time:10.5e}: cert_gap={cert_gap:10.5e}, cert_cv={}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
+        print("Iter {i_iter:5}, Time {time:10.5e}: cert_gap={cert_gap:10.5e}, cert_cv={cert_cv:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
 
     def _log_global(self, vk, Akxk, xk, i_iter, solver):
         record = {}
