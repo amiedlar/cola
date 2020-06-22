@@ -112,9 +112,9 @@ class Monitor(object):
             record['n_iter_'] = 0
         K = comm.get_world_size()
         wk = self.solver.grad_f(Akxk)
-        record['cert_gap'] = (Akxk @ wk)
+        record['cert_gap'] = Akxk @ wk
         L = 1/self.solver.theta
-        record['cert_cv'] =  norm(wk - self.solver.grad_f(vk), 2) 
+        record['cert_cv'] = norm(wk - self.solver.grad_f(vk), 2) 
         self.records.append(record)
 
         print("Iter {i_iter:5}, Time {time:10.5e}: cert_gap={cert_gap:10.5e}, cert_cv={cert_cv:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
