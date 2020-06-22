@@ -112,7 +112,7 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
         # assert (delta_v != old).any()
         v += gamma * delta_v
 
-        if monitor.log(v, Ak*xk, xk, i_iter, localsolver, delta_x):
+        if monitor.log(v, Ak*xk, xk, i_iter, localsolver, delta_xk):
             print('break iterations here.')
             #break
 
