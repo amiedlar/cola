@@ -69,7 +69,7 @@ def cola(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, graph, 
         comm.p2p_communicate_neighborhood_tensors(
             rank, local_lookups, local_vs)
 
-        if monitor.log(averaged_v, Akxk, xk, i_iter, localsolver):
+        if monitor.log(averaged_v, Akxk, xk, i_iter, localsolver, delta_x):
             print('break iterations here.')
             #break
 
@@ -112,7 +112,7 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
         # assert (delta_v != old).any()
         v += gamma * delta_v
 
-        if monitor.log(v, Ak*xk, xk, i_iter, localsolver):
+        if monitor.log(v, Ak*xk, xk, i_iter, localsolver, delta_x):
             print('break iterations here.')
             #break
 

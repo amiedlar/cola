@@ -69,19 +69,19 @@ class Monitor(object):
     #     comm.all_reduce(t, op=op)
     #     return t
 
-    def log(self, vk, Akxk, xk, i_iter, solver):
+    def log(self, vk, Akxk, xk, i_iter, solver, delta_xk=None):
         # Skip the time for logging
         self.running_time += time.time() - self.previous_time
 
         if self.mode == 'local':
-            self._log_local(vk, Akxk, xk, i_iter, solver)
+            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk)
         elif self.mode == 'global':
             self._log_global(vk, Akxk, xk, i_iter, solver)
         elif self.mode == None:
             pass
         elif self.mode == 'all':
             self.records = self.records_l
-            self._log_local(vk, Akxk, xk, i_iter, solver)
+            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk)
             self.records_l = self.records
             self.records = self.records_g
             self._log_global(vk, Akxk, xk, i_iter, solver)
@@ -100,7 +100,7 @@ class Monitor(object):
             gap = self.records_g[-1]['gap']
         return max_running_time > self.exit_time or abs(gap) < 1e-15
 
-    def _log_local(self, vk, Akxk, xk, i_iter, solver):
+    def _log_local(self, vk, Akxk, xk, i_iter, solver, delta_xk=None):
         record = {}
         record['i_iter'] = i_iter
         record['time'] = self.running_time
@@ -112,12 +112,13 @@ class Monitor(object):
             record['n_iter_'] = 0
         K = comm.get_world_size()
         wk = self.solver.grad_f(Akxk)
+        record['delta_xk'] = delta_xk if delta_xk is not None else np.nan
         record['cert_gap'] = Akxk @ wk
         L = 1/self.solver.theta
         record['cert_cv'] = norm(wk - self.solver.grad_f(vk), 2) 
         self.records.append(record)
 
-        print("Iter {i_iter:5}, Time {time:10.5e}: cert_gap={cert_gap:10.5e}, cert_cv={cert_cv:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
+        print("Iter {i_iter:5}, Time {time:10.5e}: delta_xk={delta_xk:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
 
     def _log_global(self, vk, Akxk, xk, i_iter, solver):
         record = {}
