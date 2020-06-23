@@ -53,7 +53,7 @@ def load(editor, dataset, confirm):
 @click.argument('col', type=click.INT)
 @click.argument('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
 @click.option('--scale-col', default=0, help="scale specified column (default 0)")
-@click.option('--scale-by', default=1, help="scale factor for vector specified by `--scale-col` (default 1)")
+@click.option('--scale-by', default=1.0, help="scale factor for vector specified by `--scale-col` (default 1)")
 @click.option('--weights', type=click.STRING, default=None,
     help="string containing python array with length n_col."
          "values in array correspond weights of each remaining column for replacement linear combination.")
@@ -61,11 +61,11 @@ def load(editor, dataset, confirm):
 def replace_column(editor, col, scheme, scale_col, scale_by, weights):
     print('entered replace')
     assert editor.data is not None, "load data before attempting to edit"
-    assert weights is None and scheme == 'weights', "specify weighting scheme"
+    assert not(weights is None and scheme == 'weights'), "specify weighting scheme"
     
     n_row, n_col = editor.data.shape
     if scheme == 'weights':
-        weights = np.loads(weights)
+        weights = np.fromstring(weights, sep=' ')
     elif scheme == 'scale':
         weights = np.zeros((n_col-1,))
         weights[scale_col] = scale_by
@@ -104,7 +104,7 @@ def insert_columns(editor, n, weights):
 @cli.command('insert-column')
 @click.argument('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
 @click.option('--scale-col', default=0, help="scale specified column (default 0)")
-@click.option('--scale-by', default=1, help="scale factor for vector specified by `--scale-col` (default 1)")
+@click.option('--scale-by', default=1.0, help="scale factor for vector specified by `--scale-col` (default 1)")
 @click.option('--weights', type=click.STRING, default=None,
     help="string containing python array with length n_col."
          "values in array correspond weights of each remaining column for replacement linear combination.")
@@ -114,12 +114,12 @@ def insert_column(editor, scheme, scale_col, scale_by, weights):
 
 def _insert_column(editor, scheme, scale, scale_by, weights):
     assert editor.data is not None, "load data before attempting to edit"
-    assert weights is None and scheme == 'weights', "specify weighting scheme"
+    assert not (weights is None and scheme == 'weights'), "specify weighting scheme"
     
     n_row, n_col = editor.data.shape
 
     if scheme == 'weights':
-        weights = np.loads(weights)
+        weights = np.fromstring(weights, sep=' ')
     elif scheme == 'scale':
         weights = np.zeros((n_col,))
         weights[scale] = scale_by
@@ -128,13 +128,14 @@ def _insert_column(editor, scheme, scale, scale_by, weights):
     else:
         return NotImplementedError
 
-    weights = weights.reshape((n_row,1))
+    if weights.shape[0] != n_col:
+        weights = np.concatenate((weights, [0]*(n_col - weights.shape[0])))
+    weights = weights.reshape((n_col,1))
     
     from scipy.sparse import csc_matrix
-    new_col = csc_matrix(editor.data * weights)
-
-    editor.data = np.concatenate(editor.data, new_col)
-    print("Column inserted")
+    new_col = editor.data * weights
+    new_col = new_col.reshape((n_row,1))
+    editor.data = csc_matrix(np.concatenate((editor.data.todense(), new_col), axis=1))
     return
 
 @cli.command('save-svm')
