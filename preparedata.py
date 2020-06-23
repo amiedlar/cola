@@ -161,5 +161,41 @@ def save_svm(editor, filename, overwrite):
     print(f"Data with shape {editor.data.shape} saved to '{path}'")
     return
 
+@cli.command('split')
+@click.option('--K', type=click.INT, default=0, help="if provided, data is only split for K nodes (default: all possible splits)")
+@click.option('--seed', type=click.INT, default=None, help="random shuffling seed (default: no shuffle)")
+@pass_editor
+def split(editor, k, seed):
+    if k:
+        _split_dataset(editor, k, seed)
+        return
+    for k in range(1, editor.data.shape[1]+1):
+        _split_dataset(editor, k, seed)
+
+def _split_dataset(editor, K, seed):
+    import joblib
+    _, n_features = editor.data.shape
+    output_folder = os.path.join(editor.outdir, 'features', str(K))
+    os.makedirs(os.path.join(output_folder, 'X'), exist_ok=True)
+    os.makedirs(os.path.join(output_folder, 'y'), exist_ok=True)
+
+    indices = np.arange(n_features)
+    if seed is not None:
+        np.random.seed(seed)
+        np.random.shuffle(indices)
+    block_size = int(np.ceil(n_features / K))
+
+    beg = 0
+    for k in range(K):
+        file_x = os.path.join(output_folder, 'X', str(k))
+        file_y = os.path.join(output_folder, 'y', str(k))
+        joblib.dump(editor.data[:, beg:beg+block_size], file_x)
+        joblib.dump(editor.y, file_y)
+        beg += block_size
+
+    joblib.dump(indices, os.path.join(output_folder, 'indices'))
+    print(f"Splits for world_size {K} stored in '{output_folder}'")
+
+
 if __name__ == "__main__":
     cli()
