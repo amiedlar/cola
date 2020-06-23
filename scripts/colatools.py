@@ -162,20 +162,21 @@ def save_svm(editor, filename, overwrite):
     return
 
 @cli.command('split')
+@click.argument('dataset_name', type=click.STRING, help="name for saved dataset")
 @click.option('--K', type=click.INT, default=0, help="if provided, data is only split for K nodes (default: all possible splits)")
 @click.option('--seed', type=click.INT, default=None, help="random shuffling seed (default: no shuffle)")
 @pass_editor
-def split(editor, k, seed):
+def split(editor, dataset_name, k, seed):
     if k:
-        _split_dataset(editor, k, seed)
+        _split_dataset(editor, dataset_name, k, seed)
         return
     for k in range(1, editor.data.shape[1]+1):
-        _split_dataset(editor, k, seed)
+        _split_dataset(editor, dataset_name, k, seed)
 
-def _split_dataset(editor, K, seed):
+def _split_dataset(editor, dataset, K, seed):
     import joblib
     _, n_features = editor.data.shape
-    output_folder = os.path.join(editor.outdir, 'features', str(K))
+    output_folder = os.path.join(editor.outdir, dataset, 'features', str(K))
     os.makedirs(os.path.join(output_folder, 'X'), exist_ok=True)
     os.makedirs(os.path.join(output_folder, 'y'), exist_ok=True)
 
