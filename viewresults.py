@@ -23,68 +23,68 @@ def print_weights(dataset, n_nodes, alg='cola', logpath='log', mode='final'):
         print(f'\tNode {k}: {w[k]}')
         k+=1
 
-def plot_residual(n_nodes, ref_weights, weights_path, niter, comp_weights_path=None):
-    ref_norm = np.linalg.norm(ref_weights)
-    res = [(i, np.linalg.norm(np.load(wf, allow_pickle=True) - ref_weights)/ref_norm) 
-        for (i, wf) in [(i, os.path.join(weights_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)] 
-        if os.path.exists(wf)]
-    comp_res=None
-    if comp_weights_path is not None:
-        comp_res = [(i, np.linalg.norm(np.load(wf, allow_pickle=True) - ref_weights)/ref_norm) \
-            for (i, wf) in [(i, os.path.join(comp_weights_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)]
-            if os.path.exists(wf)]
-    iters, res = zip(*res)
-    c_iters = None    
-    if comp_res is not None: 
-        c_iters, comp_res = zip(*comp_res)
+def plot_residual(n_nodes, res, comp_res=None):
+    
     fig = plt.figure(f'Residuals, {n_nodes} nodes')
    
     plt.title('Residuals')
     plt.xlabel('Iteration Count')
-    plt.ylabel('$\log_{10} (\|x_k - x\|/\|x\|)$')
-    plt.plot(iters, np.log10(res), label='CoLA')
+    plt.ylabel(r'$\log_{10} (\|\|x_k - x^*\|\|/\|\|x^*\|\|)$')
+    plt.plot(res['i_iter'], np.log10(res['res']), label='CoLA')
     if comp_res is not None:
-        plt.plot(c_iters, np.log10(comp_res), label='CoCoA')
+        plt.plot(comp_res['i_iter'], np.log10(comp_res['res']), label='CoCoA')
 
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
-    fig.tight_layout()
+    fig.tight_layout(pad=2.)
     plt.show()
     return fig
     
 
 def plot_local_results(n_nodes, local, x_axis='i_iter', x_label='global iteration step', comp_data=None):
     fig = plt.figure(f'Local Results, {n_nodes} nodes')
+    gs = GridSpec(3, 2, figure=fig)
+
     if comp_data is None:
-        plt.subplot(111)
+        fig.add_subplot(gs[0,:])
         plt.title('Gap')
     else:
-        plt.subplot(121)
+        fig.add_subplot(gs[0,0])
         plt.title('[COLA]Gap')
     plt.xlabel(x_label)
-    plt.ylabel('$\log_{10} (local\ gap)$')
-    for i in range(n_nodes):
-        plt.plot(local[i][x_axis], np.log10(local[i]['local_gap']), label=f'node {i}')
+    plt.ylabel(r'$\log_{10} (local\ gap)$')
+    for (i, node_data) in enumerate(local):
+        plt.plot(node_data[x_axis], np.log10(node_data['local_gap']), label=f'node {i}')
     
+    leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
+    leg.get_frame().set_alpha(0.5)
+
+    fig.add_subplot(gs[1:,:])
+    plt.xlabel(x_label)
+    plt.ylabel(r'$\|\| \Delta x_k \|\|$')
+    for (i, node_data) in enumerate(local):
+        plt.plot(node_data[x_axis], np.log10(node_data['delta_xk']), label=f'node {i}')
+
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
     if comp_data is None:
+        fig.tight_layout(pad=2.)
         plt.show()
-        return
+        return fig
 
-    plt.subplot(122)
+    fig.add_subplot(gs[0,1])
     plt.title('[COCOA]Gap')
     plt.xlabel(x_label)
-    plt.ylabel('$\log_{10} (local\ gap)$')
-    for i in range(n_nodes):
-        plt.plot(comp_data[i][x_axis], np.log10(comp_data[i]['local_gap']), label=f'node {i}')
+    plt.ylabel(r'$\log_{10} (local\ gap)$')
+    for i,node_data in enumerate(comp_data):
+        plt.plot(node_data[x_axis], np.log10(node_data['local_gap']), label=f'node {i}')
     
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
-    fig.tight_layout()
+    fig.tight_layout(pad=2.)
     plt.show()
     return fig
 
@@ -96,7 +96,7 @@ def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     fig.add_subplot(gs[0,0])
     plt.title('Primal')
     plt.xlabel(x_label)
-    plt.ylabel('$\mathcal{P}(w)$')
+    plt.ylabel(r'$\mathcal{P}(w)$')
     plt.plot(data[x_axis], data['P'], label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], comp_data['P'], label='CoCoA')
@@ -107,7 +107,7 @@ def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     fig.add_subplot(gs[0,1])
     plt.title('Dual')
     plt.xlabel(x_label)
-    plt.ylabel('$\mathcal{D}(x)$')
+    plt.ylabel(r'$\mathcal{D}(x)$')
     plt.plot(data[x_axis], data['D'], label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], comp_data['D'], label='CoCoA')
@@ -118,7 +118,7 @@ def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     fig.add_subplot(gs[1:,0:])
     plt.title('Primal-Dual Gap')
     plt.xlabel(x_label)
-    plt.ylabel('$\log_{10}(global\ gap)$')
+    plt.ylabel(r'$\log_{10}(global\ gap)$')
     plt.plot(data[x_axis], np.log10(np.abs(data['gap'])), label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['gap'])), label='CoCoA')
@@ -126,7 +126,7 @@ def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
-    fig.tight_layout()
+    fig.tight_layout(pad=2.)
     plt.show()
     return fig
 
@@ -135,16 +135,16 @@ def plot_primal_dual(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     plt.subplot(121)
     plt.title('Primal')
     plt.xlabel(x_label)
-    plt.ylabel('$\mathcal{P}(w)$')
+    plt.ylabel(r'$\mathcal{P}(w)$')
     plt.plot(data[x_axis], data['P'])
     
     plt.subplot(122)
     plt.title('Dual')
     plt.xlabel(x_label)
-    plt.ylabel('$\mathcal{D}(x)$')
+    plt.ylabel(r'$\mathcal{D}(x)$')
     plt.plot(data[x_axis], data['D'])
 
-    fig.tight_layout()
+    fig.tight_layout(pad=2.)
     plt.show()
     return fig
 
@@ -153,7 +153,7 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
     plt.title('Minimizer functions per iteration')
     plt.subplot(221)
     plt.xlabel(x_label)
-    plt.ylabel('$f(Ax)$')
+    plt.ylabel(r'$f(Ax)$')
     plt.plot(data[x_axis], data['f'], label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], comp_data['f'], label='CoCoA')
@@ -163,7 +163,7 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
 
     plt.subplot(222)
     plt.xlabel(x_label)
-    plt.ylabel('$g(x)$')
+    plt.ylabel(r'$g(x)$')
     plt.plot(data[x_axis], data['g'], label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], comp_data['g'], label='CoCoA')
@@ -173,7 +173,7 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
 
     plt.subplot(223)
     plt.xlabel(x_label)
-    plt.ylabel('$f^*(w)$')
+    plt.ylabel(r'$f^*(w)$')
     plt.plot(data[x_axis], data['f_conj'], label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], comp_data['f_conj'], label='CoCoA')
@@ -183,7 +183,7 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
 
     plt.subplot(224)
     plt.xlabel(x_label)
-    plt.ylabel('$g^*(-w^TA)$')
+    plt.ylabel(r'$g^*(-w^TA)$')
     plt.plot(data[x_axis], data['g_conj'], label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], comp_data['g_conj'], label='CoCoA')
@@ -191,7 +191,23 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
-    fig.tight_layout()
+    fig.tight_layout(pad=2.)
+    plt.show()
+    return fig
+
+def plot_update_and_global(local_, global_, global_y='gap', global_y_label='Global Gap', x_axis='i_iter', x_label='global iteration step'):
+    fig = plt.figure()
+
+    plt.title(r'$\|\|\Delta x_k\|\|$ and ' + global_y_label + f', {len(local_)} nodes')
+    plt.xlabel(x_label)
+    for (i, node_data) in enumerate(local_):
+        plt.plot(node_data[x_axis], np.log10(node_data['delta_xk']), label=r'$\|\| \Delta x_k \|\|$'+f', node {i}')
+
+    plt.plot(global_[x_axis], np.log10(np.abs(global_[global_y])), label=global_y_label)
+    leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
+    leg.get_frame().set_alpha(0.5)
+
+    fig.tight_layout(pad=2.)
     plt.show()
     return fig
 
@@ -229,11 +245,30 @@ def plot_results(n_nodes, logdir, dataset, compare, save, savedir):
     comp_path = os.path.join(comp_path, f'{n_nodes}')
     assert n_nodes is not None and n_nodes>0, 'logs not found, try specifying `logdir` and `n_nodes`' 
 
-    reference_weight_path = os.path.join(logdir, dataset, 'final_weight.npy')
-    showres = os.path.exists(reference_weight_path)
+    weights_path = os.path.join(logdir, dataset, 'final_weight.npy')
+    showres = os.path.exists(weights_path)
     
+    res = None
+    comp_res = None
     local_results = [pd.read_csv(os.path.join(log_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
     global_results = pd.read_csv(os.path.join(log_path, 'result.csv')).loc[1:]
+
+    if showres:
+        ref_weights = np.load(weights_path, allow_pickle=True)
+        ref_norm = np.linalg.norm(ref_weights)
+        niter = int(max(global_results['i_iter']))
+        res = [(i, np.linalg.norm(np.load(wf, allow_pickle=True) - ref_weights)/ref_norm) 
+            for (i, wf) in [(i, os.path.join(log_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)] 
+            if os.path.exists(wf)]
+        if compare:
+            comp_res = [(i, np.linalg.norm(np.load(wf, allow_pickle=True) - ref_weights)/ref_norm) \
+                for (i, wf) in [(i, os.path.join(comp_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)]
+                if os.path.exists(wf)]
+        res = pd.DataFrame([*res], columns=['i_iter', 'res'])
+        print(res)
+        if comp_res is not None: 
+            comp_res = pd.DataFrame([*comp_res], columns=['i_iter', 'res'])
+
     comp_local = None 
     comp_global = None 
     
@@ -257,9 +292,16 @@ def plot_results(n_nodes, logdir, dataset, compare, save, savedir):
     if savedir is not None:
         fig.savefig(os.path.join(savedir, 'duality-gap.pdf'), dpi=150)
 
+    fig = plot_update_and_global(local_results, global_results)
+    if savedir is not None:
+        fig.savefig(os.path.join(savedir, 'update-and-gap.pdf'), dpi=150)
+
     if showres:
-        ref_weight = np.load(reference_weight_path, allow_pickle=True)
-        fig = plot_residual(n_nodes, ref_weight, log_path, int(max(global_results['i_iter'])), comp_weights_path=comp_path)
+        fig = plot_update_and_global(local_results, res, global_y='res', global_y_label=r'$\log_{10} (\|\|x_k - x^*\|\|/\|\|x^*\|\|)$')
+        if savedir is not None:
+            fig.savefig(os.path.join(savedir, 'update-and-res.pdf'), dpi=150)
+
+        fig = plot_residual(n_nodes, res, comp_res)
         if savedir is not None:
             fig.savefig(os.path.join(savedir, 'relative_error.pdf'), dpi=150) 
     
