@@ -75,12 +75,67 @@ def replace_column(editor, col, uniform, weights):
     editor.data[:,col] = csc_matrix(new_col.reshape((n_row,1)))
     return
 
+@cli.command('insert-columns')
+@click.argument('n', type=click.INT)
+@click.option('--weights', type=click.STRING, default=None)
+@pass_editor
+def insert_columns(editor, n, weights):
+    print('entered replace')
+    assert editor.data is not None, "load data before attempting to edit"
+    # assert weights is not None or uniform, "either specify weights or use the `--uniform` flag"
+    if weights:
+        from json import loads
+        weights = loads(weights)
+        for spec in weights:
+            _insert_column(editor, spec.get('scheme'), spec.get('scale', 0), spec.get('scale_by', 1), spec.get('weights'))
+        return
+    
+    for i in range(n):
+        _insert_column(editor, 'uniform', 0, 1, None)    
+
+    return
+
+@cli.command('insert-column')
+@click.option('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
+@click.option('--scale', default=0, help="scale specified column (default 0)")
+@click.option('--scale-by', default=1, help="scale factor for vector specified by `--scale` (default 1)")
+@click.option('--weights', type=click.STRING, default=None,
+    help="string containing python array with length n_col."
+         "values in array correspond weights of each remaining column for replacement linear combination.")
+@pass_editor
+def insert_column(editor, scheme, scale, scale_by, weights):
+    _insert_column(editor, scheme, scale, scale_by, weights)
+
+def _insert_column(editor, scheme, scale, scale_by, weights):
+    assert editor.data is not None, "load data before attempting to edit"
+    assert weights is None and scheme == 'weights', "specify weighting scheme"
+    
+    n_row, n_col = editor.data.shape
+
+    if scheme == 'weights':
+        weights = np.loads(weights)
+    elif scheme == 'scale':
+        weights = np.zeros((n_col,))
+        weights[scale] = scale_by
+    elif scheme == 'uniform':
+        weights = np.array([1/n_col]*n_col)
+    else:
+        return NotImplementedError
+
+    weights = weights.reshape((n_row,1))
+    
+    from scipy.sparse import csc_matrix
+    new_col = csc_matrix(editor.data * weights)
+
+    editor.data = np.concatenate(editor.data, new_col)
+    print("Column inserted")
+    return
+
 @cli.command('save-svm')
 @click.argument('filename', type=click.STRING)
 @click.option('--overwrite', is_flag=True)
 @pass_editor
 def save_svm(editor, filename, overwrite):
-    print('entered save')
     assert editor.data is not None, "no data is loaded"
     path = os.path.join(editor.indir, filename)
     if os.path.exists(path) and not overwrite:
@@ -89,7 +144,7 @@ def save_svm(editor, filename, overwrite):
     elif os.path.exists(path):
         print(f"Warning: '{path}' already exists, overwriting")
         os.remove(path)
-
+    print(f"Data saved to '{path}'")
     dump_svmlight_file(editor.data, editor.y, path)
     return
 
