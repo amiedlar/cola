@@ -51,7 +51,7 @@ def load(editor, dataset, confirm):
 
 @cli.command('replace-column')
 @click.argument('col', type=click.INT)
-@click.option('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
+@click.argument('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
 @click.option('--scale-col', default=0, help="scale specified column (default 0)")
 @click.option('--scale-by', default=1, help="scale factor for vector specified by `--scale-col` (default 1)")
 @click.option('--weights', type=click.STRING, default=None,
@@ -102,7 +102,7 @@ def insert_columns(editor, n, weights):
     return
 
 @cli.command('insert-column')
-@click.option('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
+@click.argument('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
 @click.option('--scale-col', default=0, help="scale specified column (default 0)")
 @click.option('--scale-by', default=1, help="scale factor for vector specified by `--scale-col` (default 1)")
 @click.option('--weights', type=click.STRING, default=None,
