@@ -26,6 +26,7 @@ setup(
         'fast_cd'],
     entry_points='''
         [console_scripts]
+        viewresults=viewresults:plot_results
         colatools=scripts.colatools:cli
         run_cola=run_cola:main
     ''')

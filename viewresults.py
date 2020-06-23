@@ -7,11 +7,11 @@ import numpy as np
 import pandas as pd
 import os
 
-def print_weights(dataset, n_nodes, alg='cola', logpath='log', mode='final'):
+def print_weights(dataset, k, alg='cola', logpath='log', mode='final'):
     if alg == 'cola':
-        logpath = os.path.join(logpath, dataset, f'{n_nodes}')
+        logpath = os.path.join(logpath, dataset, f'{k}')
     else:
-        logpath = os.path.join(logpath, alg, dataset, n_nodes)
+        logpath = os.path.join(logpath, alg, dataset, k)
     if mode == 'final':
         logpath = os.path.join(logpath, 'weight.py')
     else:
@@ -23,9 +23,9 @@ def print_weights(dataset, n_nodes, alg='cola', logpath='log', mode='final'):
         print(f'\tNode {k}: {w[k]}')
         k+=1
 
-def plot_residual(n_nodes, res, comp_res=None):
+def plot_residual(k, res, comp_res=None):
     
-    fig = plt.figure(f'Residuals, {n_nodes} nodes')
+    fig = plt.figure(f'Residuals, {k} nodes')
    
     plt.title('Residuals')
     plt.xlabel('Iteration Count')
@@ -38,12 +38,11 @@ def plot_residual(n_nodes, res, comp_res=None):
     leg.get_frame().set_alpha(0.5)
 
     fig.tight_layout(pad=2.)
-    plt.show()
     return fig
     
 
-def plot_local_results(n_nodes, local, x_axis='i_iter', x_label='global iteration step', comp_data=None):
-    fig = plt.figure(f'Local Results, {n_nodes} nodes')
+def plot_local_results(k, local, x_axis='i_iter', x_label='global iteration step', comp_data=None):
+    fig = plt.figure(f'Local Results, {k} nodes')
     gs = GridSpec(3, 2, figure=fig)
 
     if comp_data is None:
@@ -85,12 +84,11 @@ def plot_local_results(n_nodes, local, x_axis='i_iter', x_label='global iteratio
     leg.get_frame().set_alpha(0.5)
 
     fig.tight_layout(pad=2.)
-    plt.show()
     return fig
 
-def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
+def plot_duality_gap(k, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
     # Plot primal and dual
-    fig = plt.figure(f'Global Results, {n_nodes} nodes')
+    fig = plt.figure(f'Global Results, {k} nodes')
     gs = GridSpec(3, 2, figure=fig)
 
     fig.add_subplot(gs[0,0])
@@ -127,11 +125,10 @@ def plot_duality_gap(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     leg.get_frame().set_alpha(0.5)
 
     fig.tight_layout(pad=2.)
-    plt.show()
     return fig
 
-def plot_primal_dual(n_nodes, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
-    fig = plt.figure(f'Primal and Dual Values, {n_nodes} nodes')
+def plot_primal_dual(k, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
+    fig = plt.figure(f'Primal and Dual Values, {k} nodes')
     plt.subplot(121)
     plt.title('Primal')
     plt.xlabel(x_label)
@@ -145,11 +142,10 @@ def plot_primal_dual(n_nodes, data, x_axis='i_iter', x_label='global iteration s
     plt.plot(data[x_axis], data['D'])
 
     fig.tight_layout(pad=2.)
-    plt.show()
     return fig
 
-def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
-    fig = plt.figure(f'Minimizer Values, {n_nodes} nodes')
+def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', comp_data=None):
+    fig = plt.figure(f'Minimizer Values, {k} nodes')
     plt.title('Minimizer functions per iteration')
     plt.subplot(221)
     plt.xlabel(x_label)
@@ -192,7 +188,6 @@ def plot_minimizers(n_nodes, data, x_axis='i_iter', x_label='global iteration st
     leg.get_frame().set_alpha(0.5)
 
     fig.tight_layout(pad=2.)
-    plt.show()
     return fig
 
 def plot_update_and_global(local_, global_, global_y='gap', global_y_label='Global Gap', x_axis='i_iter', x_label='global iteration step'):
@@ -208,17 +203,18 @@ def plot_update_and_global(local_, global_, global_y='gap', global_y_label='Glob
     leg.get_frame().set_alpha(0.5)
 
     fig.tight_layout(pad=2.)
-    plt.show()
     return fig
 
+
 @click.command()
-@click.option('--n_nodes', type=click.INT, default=None, help='Number of mpi processes')
+@click.option('--k', type=click.INT, default=None, help='Number of mpi processes')
 @click.option('--logdir', type=click.STRING, default='log', help='root directory of output files')
 @click.option('--dataset', type=click.STRING, default='rderms', help='dataset name')
 @click.option('--compare', is_flag=True)
 @click.option('--save', is_flag=True)
+@click.option('--show/--no-show', default=True)
 @click.option('--savedir', type=click.STRING, default=None)
-def plot_results(n_nodes, logdir, dataset, compare, save, savedir):
+def plot_results(k, logdir, dataset, compare, save, show, savedir):
     if save and savedir is None:
         savedir = 'out'
     log_path = os.path.join(logdir, dataset) 
@@ -230,27 +226,27 @@ def plot_results(n_nodes, logdir, dataset, compare, save, savedir):
         print(f"Log directory not found at '{comp_path}'")
         exit(1)
     local_results = []
-    if not n_nodes:
-        n_nodes = 1
+    if not k:
+        k = 1
         while True:
-            next_dir = os.path.join(log_path, f'{n_nodes}')
+            next_dir = os.path.join(log_path, f'{k}')
             if os.path.exists(next_dir):
                 break
-            n_nodes+=1
-            if n_nodes>256:
+            k+=1
+            if k>256:
                 print('No logs found in directory.')
                 exit(1)
     
-    log_path = os.path.join(log_path, f'{n_nodes}')
-    comp_path = os.path.join(comp_path, f'{n_nodes}')
-    assert n_nodes is not None and n_nodes>0, 'logs not found, try specifying `logdir` and `n_nodes`' 
+    log_path = os.path.join(log_path, f'{k}')
+    comp_path = os.path.join(comp_path, f'{k}')
+    assert k is not None and k>0, 'logs not found, try specifying `logdir` and `k`' 
 
     weights_path = os.path.join(logdir, dataset, 'final_weight.npy')
     showres = os.path.exists(weights_path)
     
     res = None
     comp_res = None
-    local_results = [pd.read_csv(os.path.join(log_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
+    local_results = [pd.read_csv(os.path.join(log_path,f'{i}result.csv')).loc[1:] for i in range(k)]
     global_results = pd.read_csv(os.path.join(log_path, 'result.csv')).loc[1:]
 
     if showres:
@@ -273,37 +269,39 @@ def plot_results(n_nodes, logdir, dataset, compare, save, savedir):
     comp_global = None 
     
     if compare:
-        comp_local = [pd.read_csv(os.path.join(comp_path,f'{i}result.csv')).loc[1:] for i in range(n_nodes)]
+        comp_local = [pd.read_csv(os.path.join(comp_path,f'{i}result.csv')).loc[1:] for i in range(k)]
         comp_global = pd.read_csv(os.path.join(comp_path, 'result.csv')).loc[1:]
     else:
         comp_path = None
     
-    fig = plot_local_results(n_nodes, local_results, x_label='Iteration Count', comp_data=comp_local)
     if savedir is not None:
-        savedir = os.path.join(savedir, dataset, f'{n_nodes}')
+        savedir = os.path.join(savedir, dataset, f'{k}')
         os.makedirs(savedir, exist_ok=True)
-        fig.savefig(os.path.join(savedir, 'local.pdf'), dpi=150)
+    def saveorshow(fig, name):
+        if save:
+            fig.savefig(os.path.join(savedir, name), dpi=150)
+        if show:
+            plt.show()
 
-    fig = plot_minimizers(n_nodes, global_results, x_label='Iteration Count', comp_data=comp_global)
-    if savedir is not None:
-        fig.savefig(os.path.join(savedir, 'minimizers.pdf'), dpi=150)
+    # Plotting
+    fig = plot_local_results(k, local_results, x_label='Iteration Count', comp_data=comp_local)
+    saveorshow(fig, 'local.pdf')
 
-    fig = plot_duality_gap(n_nodes, global_results, x_label='Iteration Count', comp_data=comp_global)
-    if savedir is not None:
-        fig.savefig(os.path.join(savedir, 'duality-gap.pdf'), dpi=150)
+    fig = plot_minimizers(k, global_results, x_label='Iteration Count', comp_data=comp_global)
+    saveorshow(fig, 'minimizers.pdf')
+
+    fig = plot_duality_gap(k, global_results, x_label='Iteration Count', comp_data=comp_global)
+    saveorshow(fig, 'duality-gap.pdf')
 
     fig = plot_update_and_global(local_results, global_results)
-    if savedir is not None:
-        fig.savefig(os.path.join(savedir, 'update-and-gap.pdf'), dpi=150)
+    saveorshow(fig, 'update-and-gap.pdf')
 
     if showres:
         fig = plot_update_and_global(local_results, res, global_y='res', global_y_label=r'$\log_{10} (\|\|x_k - x^*\|\|/\|\|x^*\|\|)$')
-        if savedir is not None:
-            fig.savefig(os.path.join(savedir, 'update-and-res.pdf'), dpi=150)
+        saveorshow(fig, 'update-and-res.pdf')
 
-        fig = plot_residual(n_nodes, res, comp_res)
-        if savedir is not None:
-            fig.savefig(os.path.join(savedir, 'relative_error.pdf'), dpi=150) 
-    
+        fig = plot_residual(k, res, comp_res)
+        saveorshow(fig, 'relative_error.pdf') 
+
 if __name__ == '__main__':
     plot_results()
