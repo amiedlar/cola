@@ -51,22 +51,28 @@ def load(editor, dataset, confirm):
 
 @cli.command('replace-column')
 @click.argument('col', type=click.INT)
-@click.option('--uniform', is_flag=True, help="if true, all remaining columns are given equal weighting of 1/(n_col - 1)")
+@click.option('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
+@click.option('--scale-col', default=0, help="scale specified column (default 0)")
+@click.option('--scale-by', default=1, help="scale factor for vector specified by `--scale-col` (default 1)")
 @click.option('--weights', type=click.STRING, default=None,
-    help="string containing python array with length n_col-1."
-         "values in array correspond weights of each remaining column for replacement linear combination."
-         "overwritten by `--uniform` flag")
+    help="string containing python array with length n_col."
+         "values in array correspond weights of each remaining column for replacement linear combination.")
 @pass_editor
-def replace_column(editor, col, uniform, weights):
+def replace_column(editor, col, scheme, scale_col, scale_by, weights):
     print('entered replace')
     assert editor.data is not None, "load data before attempting to edit"
-    assert weights is not None or uniform, "either specify weights or use the `--uniform` flag"
+    assert weights is None and scheme == 'weights', "specify weighting scheme"
     
-    n_row,n_col = editor.data.shape
-    if uniform:
+    n_row, n_col = editor.data.shape
+    if scheme == 'weights':
+        weights = np.loads(weights)
+    elif scheme == 'scale':
+        weights = np.zeros((n_col-1,))
+        weights[scale_col] = scale_by
+    elif scheme == 'uniform':
         weights = np.array([1/(n_col-1)]*(n_col-1))
     else:
-        weights = np.loads(weights)
+        return NotImplementedError
 
     weights = np.insert(weights, col, 0)
 
@@ -87,7 +93,7 @@ def insert_columns(editor, n, weights):
         from json import loads
         weights = loads(weights)
         for spec in weights:
-            _insert_column(editor, spec.get('scheme'), spec.get('scale', 0), spec.get('scale_by', 1), spec.get('weights'))
+            _insert_column(editor, spec.get('scheme'), spec.get('scale_col', 0), spec.get('scale_by', 1), spec.get('weights'))
         return
     
     for i in range(n):
@@ -97,14 +103,14 @@ def insert_columns(editor, n, weights):
 
 @cli.command('insert-column')
 @click.option('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
-@click.option('--scale', default=0, help="scale specified column (default 0)")
-@click.option('--scale-by', default=1, help="scale factor for vector specified by `--scale` (default 1)")
+@click.option('--scale-col', default=0, help="scale specified column (default 0)")
+@click.option('--scale-by', default=1, help="scale factor for vector specified by `--scale-col` (default 1)")
 @click.option('--weights', type=click.STRING, default=None,
     help="string containing python array with length n_col."
          "values in array correspond weights of each remaining column for replacement linear combination.")
 @pass_editor
-def insert_column(editor, scheme, scale, scale_by, weights):
-    _insert_column(editor, scheme, scale, scale_by, weights)
+def insert_column(editor, scheme, scale_col, scale_by, weights):
+    _insert_column(editor, scheme, scale_col, scale_by, weights)
 
 def _insert_column(editor, scheme, scale, scale_by, weights):
     assert editor.data is not None, "load data before attempting to edit"
