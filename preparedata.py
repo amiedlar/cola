@@ -59,18 +59,20 @@ def load(editor, dataset, confirm):
          "values in array correspond weights of each remaining column for replacement linear combination.")
 @pass_editor
 def replace_column(editor, col, scheme, scale_col, scale_by, weights):
-    print('entered replace')
     assert editor.data is not None, "load data before attempting to edit"
     assert not(weights is None and scheme == 'weights'), "specify weighting scheme"
     
     n_row, n_col = editor.data.shape
     if scheme == 'weights':
         weights = np.fromstring(weights, sep=' ')
+        debug_str=f'A*{np.array2string(weights)}^T'
     elif scheme == 'scale':
         weights = np.zeros((n_col-1,))
         weights[scale_col] = scale_by
+        debug_str=f'{scale_by}*A[:,{scale_col}]'
     elif scheme == 'uniform':
         weights = np.array([1/(n_col-1)]*(n_col-1))
+        debug_str=f'average of other columns'
     else:
         return NotImplementedError
 
@@ -79,6 +81,7 @@ def replace_column(editor, col, scheme, scale_col, scale_by, weights):
     new_col = editor.data * weights
     from scipy.sparse import csc_matrix
     editor.data[:,col] = csc_matrix(new_col.reshape((n_row,1)))
+    print(f"Replaced A[:,{col}] with "+debug_str)
     return
 
 @cli.command('insert-columns')
@@ -86,7 +89,6 @@ def replace_column(editor, col, scheme, scale_col, scale_by, weights):
 @click.option('--weights', type=click.STRING, default=None)
 @pass_editor
 def insert_columns(editor, n, weights):
-    print('entered replace')
     assert editor.data is not None, "load data before attempting to edit"
     # assert weights is not None or uniform, "either specify weights or use the `--uniform` flag"
     if weights:
@@ -117,14 +119,17 @@ def _insert_column(editor, scheme, scale, scale_by, weights):
     assert not (weights is None and scheme == 'weights'), "specify weighting scheme"
     
     n_row, n_col = editor.data.shape
-
+    debug_str=''
     if scheme == 'weights':
         weights = np.fromstring(weights, sep=' ')
+        debug_str=f'A*{np.array2string(weights)}^T'
     elif scheme == 'scale':
         weights = np.zeros((n_col,))
         weights[scale] = scale_by
+        debug_str=f'{scale_by}*A[:,{scale}]'
     elif scheme == 'uniform':
         weights = np.array([1/n_col]*n_col)
+        debug_str=f'average of existing columns'
     else:
         return NotImplementedError
 
@@ -136,6 +141,7 @@ def _insert_column(editor, scheme, scale, scale_by, weights):
     new_col = editor.data * weights
     new_col = new_col.reshape((n_row,1))
     editor.data = csc_matrix(np.concatenate((editor.data.todense(), new_col), axis=1))
+    print("Inserted new column as "+debug_str)
     return
 
 @cli.command('save-svm')
@@ -151,8 +157,8 @@ def save_svm(editor, filename, overwrite):
     elif os.path.exists(path):
         print(f"Warning: '{path}' already exists, overwriting")
         os.remove(path)
-    print(f"Data saved to '{path}'")
     dump_svmlight_file(editor.data, editor.y, path)
+    print(f"Data with shape {editor.data.shape} saved to '{path}'")
     return
 
 if __name__ == "__main__":
