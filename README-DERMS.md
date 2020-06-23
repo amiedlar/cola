@@ -36,7 +36,7 @@ dump_svmlight_file(X[:,0:5], X[:,0],'data/data1.svm')
 
 
 
-preparedata load mg_scale \ 
+colatools load mg_scale \ 
     replace-column --scale-col 0 --scale-by 1.1 5 scale \
     replace-column --scale-col 1 --scale-by .9  4 scale \
     replace-column --weights "[-0.1, -0.2, 2, 0, 0]" 3 weight \ 

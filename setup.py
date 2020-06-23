@@ -26,6 +26,6 @@ setup(
         'fast_cd'],
     entry_points='''
         [console_scripts]
-        preparedata=preparedata:cli
+        colatools=scripts.colatools:cli
         run_cola=run_cola:main
     ''')
