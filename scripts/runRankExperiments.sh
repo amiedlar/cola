@@ -3,6 +3,8 @@
 replace_dataset="mg_scale_replace"
 insert_dataset="mg_scale_insert"
 control_dataset="mg_scale"
+LOG_ROOT=${LOG_ROOT:-'./log'}
+SAVE_DIR=${SAVE_DIR:-'./out'}
 
 clean_dataset() {
     DATASET=$1
@@ -12,8 +14,8 @@ clean_dataset() {
     rm -rf ./data/$DATASET &> /dev/null
     if [ $ALL = true ]; then
         echo -e $"|-> Cleaning log and output for '"$DATASET"'"
-        rm -rf ./log/$DATASET &> /dev/null
-        rm -rf ./out/$DATASET &> /dev/null
+        rm -rf $LOG_ROOT/$DATASET &> /dev/null
+        rm -rf $SAVE_DIR/$DATASET &> /dev/null
     fi
 }
 
@@ -45,8 +47,7 @@ echo -e $"\e[0m"
 echo -e $"Starting experiments..."
 
 echo -e $"|-> Setting Parameters"
-OUTPUT_DIR=${OUTPUT_DIR:-'./log'}
-SAVEDIR=${SAVEDIR:-'out'}
+
 export JOBLIB_CACHE_DIR='./cache'
 
 global_steps=200
@@ -71,7 +72,7 @@ echo -e $"\e[1mSTART: Control\e[0m"
 dataset=$control_dataset
 for world_size in {1..6};
 do
-    log_path=$OUTPUT_DIR'/'$dataset'/'$world_size'/'
+    log_path=$LOG_ROOT'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
     mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
@@ -83,7 +84,7 @@ do
         --theta $theta \
         --l1_ratio $l1_ratio \
         --lambda_ $lambda \
-        --output_dir ${OUTPUT_DIR} \
+        --output_dir ${LOG_ROOT} \
         --dataset_size 'all' \
         --ckpt_freq 1 \
         --dataset $dataset \
@@ -92,8 +93,8 @@ do
         --use_split_dataset \
     	> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to '"$SAVEDIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $SAVEDIR --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --savedir $SAVE_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -106,7 +107,7 @@ dataset=$replace_dataset
 
 for world_size in {1..6};
 do
-    log_path=$OUTPUT_DIR'/'$dataset'/'$world_size'/'
+    log_path=$LOG_ROOT'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
     mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
@@ -118,7 +119,7 @@ do
         --theta $theta \
         --l1_ratio $l1_ratio \
         --lambda_ $lambda \
-        --output_dir ${OUTPUT_DIR} \
+        --output_dir ${LOG_ROOT} \
         --dataset_size 'all' \
         --ckpt_freq 1 \
         --dataset $dataset \
@@ -127,8 +128,8 @@ do
         --use_split_dataset \
     	&> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to '"$SAVEDIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $SAVEDIR --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --savedir $SAVE_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -140,7 +141,7 @@ echo -e $"\e[1mSTART: Column Insertion\e[0m"
 dataset=$insert_dataset
 for world_size in {1..10};
 do
-    log_path=$OUTPUT_DIR'/'$dataset'/'$world_size'/'
+    log_path=$LOG_ROOT'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
     mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
@@ -152,7 +153,7 @@ do
         --theta $theta \
         --l1_ratio $l1_ratio \
         --lambda_ $lambda \
-        --output_dir ${OUTPUT_DIR} \
+        --output_dir ${LOG_ROOT} \
         --dataset_size 'all' \
         --ckpt_freq 1 \
         --dataset $dataset \
@@ -161,8 +162,8 @@ do
         --use_split_dataset \
     	&> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to '"$SAVEDIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $SAVEDIR --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --savedir $SAVE_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
