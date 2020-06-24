@@ -37,6 +37,7 @@ setup(
         ]
     },
     scripts=[
-        'scripts/runRankExperiments.sh'
+        'scripts/runRankExperiments.sh',
+        'scripts/runSingle.sh'
     ]
 )

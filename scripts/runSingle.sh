@@ -47,7 +47,7 @@ then
         --dataset $DATASET \
         --solvername $local_alg \
         --algoritmname $global_alg \
-        --use_split_dataset \
+        --use_split_dataset
 else
     mpirun -n $K --output-filename $log_path'mpilog' run-cola \
         --split_by 'features' \
@@ -64,8 +64,8 @@ else
         --dataset $DATASET \
         --solvername $local_alg \
         --algoritmname $global_alg \
-        --use_split_dataset \
+        --use_split_dataset
 fi
 # Save result plot
-echo -e $"|-> Saving result plots to 'out/"$DATASET"/"$K"/'.."
+echo -e $"|-> Saving result plots to 'out/"$DATASET"/"$K"/'"
 viewresults --dataset $DATASET --k $K --no-show --save &> /dev/null;
