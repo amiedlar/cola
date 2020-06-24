@@ -4,11 +4,11 @@ K=${K:-6}
 OVERSUB=${OVERSUB:-false}
 
 colatools load $DATASET \
-    split --k $K --seed 1 $DATASET
+    split --K $K --seed 1 $DATASET
 
 echo -e $"|-> Setting Parameters"
 OUTPUT_DIR=${OUTPUT_DIR:-'./log'}
-SAVE_DIR=${SAVE_DIR:-'out'}
+SAVEDIR=${SAVEDIR:-'out'}
 export JOBLIB_CACHE_DIR='./cache'
 
 global_steps=200
@@ -68,5 +68,5 @@ else
         --use_split_dataset
 fi
 # Save result plot
-echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$DATASET"/"$K"/'"
-viewresults --dataset $DATASET --k $K --save-dir $SAVE_DIR --no-show --save &> /dev/null;
+echo -e $"|-> Saving result plots to '"$SAVEDIR"/"$DATASET"/"$K"/'"
+viewresults --dataset $DATASET --k $K --savedir $SAVEDIR --no-show --save &> /dev/null;
