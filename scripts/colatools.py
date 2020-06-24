@@ -17,10 +17,13 @@ class RankEditor(object):
 pass_editor = click.make_pass_decorator(RankEditor)
 
 @click.group(chain=True)
+@click.option('--basepath', default='.')
 @click.option('--indir', default=os.path.join('..', 'data'))
 @click.option('--outdir', default='data')
 @click.pass_context
-def cli(ctx, indir, outdir):
+def cli(ctx, basepath, indir, outdir):
+    indir = os.path.join(basepath, indir)
+    outdir = os.path.join(basepath, outdir)
     ctx.obj = RankEditor(indir, outdir) 
 
 @cli.command('load')

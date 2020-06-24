@@ -1,9 +1,13 @@
 ## Partitioning and Running
 
-From the cola-master directory:
+From the cola-master directory: Use CoLATools to load the dataset and split across ranks
 ```
-world_size=4
-python3 split_dataset.py --K=$world_size --input_file=~/working/data/data.svm --outdir=data/rderms
+svm_source_dir=../data
+local_data_dir=./data
+dataset=rderms2
+colatools --indir $svm_source_dir --outdir $local_data_dir \
+    load $dataset \
+    split $dataset
 ```
 
 To run cola:
@@ -29,17 +33,14 @@ mpirun -n $world_size --oversubscribe python3 run_cola.py \
     --algoritmname cola \
     --use_split_dataset
 ```
-from sklearn.datasets import dump_svmlight_file
-import numpy as np
-X = np.loadtxt('../../data/data.txt')
-dump_svmlight_file(X[:,0:5], X[:,0],'data/data1.svm')
 
 
-
+## CoLATools Rank Manipulation Example
+```
 colatools load mg_scale \ 
     replace-column --scale-col 0 --scale-by 1.1 5 scale \
     replace-column --scale-col 1 --scale-by .9  4 scale \
     replace-column --weights "[-0.1, -0.2, 2, 0, 0]" 3 weight \ 
     replace-column 2 uniform \ 
     save-svm mg_scale_replace.svm
-
+```

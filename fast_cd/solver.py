@@ -5,8 +5,8 @@ from scipy import sparse
 from sklearn.utils import check_X_y, check_array
 from sklearn.utils.validation import check_random_state
 
-import pyximport
-pyximport.install()
+# import pyximport
+# pyximport.install()
 from . import svm
 from . import elasticnet
 

@@ -25,11 +25,13 @@ outdir/
                 - ...
             - indices   # (n_features, ) which is sequential order for all ranks.
 """
+print("Warning: 'split_dataset' is depreciated, use 'colatools' to load and split datasets.")
 import argparse
 import os
 import numpy as np
 import joblib
 from sklearn.datasets import load_svmlight_file
+
 
 parser = argparse.ArgumentParser(description="""""")
 parser.add_argument('--input_file', type=str, help='input libsvm')
