@@ -285,23 +285,23 @@ def plot_results(k, logdir, dataset, compare, save, show, savedir):
 
     # Plotting
     fig = plot_local_results(k, local_results, x_label='Iteration Count', comp_data=comp_local)
-    saveorshow(fig, 'local.pdf')
+    saveorshow(fig, 'local.png')
 
     fig = plot_minimizers(k, global_results, x_label='Iteration Count', comp_data=comp_global)
-    saveorshow(fig, 'minimizers.pdf')
+    saveorshow(fig, 'minimizers.png')
 
     fig = plot_duality_gap(k, global_results, x_label='Iteration Count', comp_data=comp_global)
-    saveorshow(fig, 'duality-gap.pdf')
+    saveorshow(fig, 'duality-gap.png')
 
     fig = plot_update_and_global(local_results, global_results)
-    saveorshow(fig, 'update-and-gap.pdf')
+    saveorshow(fig, 'update-and-gap.png')
 
     if showres:
         fig = plot_update_and_global(local_results, res, global_y='res', global_y_label=r'$\log_{10} (\|\|x_k - x^*\|\|/\|\|x^*\|\|)$')
-        saveorshow(fig, 'update-and-res.pdf')
+        saveorshow(fig, 'update-and-res.png')
 
         fig = plot_residual(k, res, comp_res)
-        saveorshow(fig, 'relative_error.pdf') 
+        saveorshow(fig, 'relative_error.png') 
 
 if __name__ == '__main__':
     plot_results()
