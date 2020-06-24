@@ -184,6 +184,7 @@ def _split_dataset(editor, dataset, K, seed):
     if seed is not None:
         np.random.seed(seed)
         np.random.shuffle(indices)
+        print(f"randomized indices: {indices}")
     block_size = int(np.ceil(n_features / K))
 
     beg = 0
