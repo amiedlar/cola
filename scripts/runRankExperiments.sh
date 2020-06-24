@@ -3,8 +3,8 @@
 replace_dataset="mg_scale_replace"
 insert_dataset="mg_scale_insert"
 control_dataset="mg_scale"
-LOG_ROOT=${LOG_ROOT:-'./log'}
-SAVE_DIR=${SAVE_DIR:-'./out'}
+LOG_DIR=${LOG_DIR:-'./log'}
+OUT_DIR=${OUT_DIR:-'./out'}
 
 clean_dataset() {
     DATASET=$1
@@ -14,8 +14,8 @@ clean_dataset() {
     rm -rf ./data/$DATASET &> /dev/null
     if [ $ALL = true ]; then
         echo -e $"|-> Cleaning log and output for '"$DATASET"'"
-        rm -rf $LOG_ROOT/$DATASET &> /dev/null
-        rm -rf $SAVE_DIR/$DATASET &> /dev/null
+        rm -rf $LOG_DIR/$DATASET &> /dev/null
+        rm -rf $OUT_DIR/$DATASET &> /dev/null
     fi
 }
 
@@ -72,7 +72,7 @@ echo -e $"\e[1mSTART: Control\e[0m"
 dataset=$control_dataset
 for world_size in {1..6};
 do
-    log_path=$LOG_ROOT'/'$dataset'/'$world_size'/'
+    log_path=$LOG_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
     mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
@@ -84,7 +84,7 @@ do
         --theta $theta \
         --l1_ratio $l1_ratio \
         --lambda_ $lambda \
-        --output_dir ${LOG_ROOT} \
+        --output_dir ${LOG_DIR} \
         --dataset_size 'all' \
         --ckpt_freq 1 \
         --dataset $dataset \
@@ -93,8 +93,8 @@ do
         --use_split_dataset \
     	> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $SAVE_DIR --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$OUT_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --savedir $OUT_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -107,7 +107,7 @@ dataset=$replace_dataset
 
 for world_size in {1..6};
 do
-    log_path=$LOG_ROOT'/'$dataset'/'$world_size'/'
+    log_path=$LOG_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
     mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
@@ -119,7 +119,7 @@ do
         --theta $theta \
         --l1_ratio $l1_ratio \
         --lambda_ $lambda \
-        --output_dir ${LOG_ROOT} \
+        --output_dir ${LOG_DIR} \
         --dataset_size 'all' \
         --ckpt_freq 1 \
         --dataset $dataset \
@@ -128,8 +128,8 @@ do
         --use_split_dataset \
     	&> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $SAVE_DIR --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$OUT_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --savedir $OUT_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -141,7 +141,7 @@ echo -e $"\e[1mSTART: Column Insertion\e[0m"
 dataset=$insert_dataset
 for world_size in {1..10};
 do
-    log_path=$LOG_ROOT'/'$dataset'/'$world_size'/'
+    log_path=$LOG_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
     mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
@@ -153,7 +153,7 @@ do
         --theta $theta \
         --l1_ratio $l1_ratio \
         --lambda_ $lambda \
-        --output_dir ${LOG_ROOT} \
+        --output_dir ${LOG_DIR} \
         --dataset_size 'all' \
         --ckpt_freq 1 \
         --dataset $dataset \
@@ -162,8 +162,8 @@ do
         --use_split_dataset \
     	&> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $SAVE_DIR --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$OUT_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --savedir $OUT_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up

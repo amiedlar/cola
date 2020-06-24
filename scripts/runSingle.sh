@@ -7,8 +7,8 @@ colatools load $DATASET \
     split --K $K --seed 1 $DATASET
 
 echo -e $"|-> Setting Parameters"
-OUTPUT_DIR=${OUTPUT_DIR:-'./log'}
-SAVEDIR=${SAVEDIR:-'out'}
+LOG_DIR=${LOG_DIR:-'./log'}
+OUT_DIR=${OUT_DIR:-'out'}
 export JOBLIB_CACHE_DIR='./cache'
 
 global_steps=200
@@ -28,7 +28,7 @@ global_alg='cola'
 echo -e $"|-> Using global algorithm "$global_alg
 
 
-log_path=$OUTPUT_DIR'/'$DATASET'/'$K'/'
+log_path=$LOG_DIR'/'$DATASET'/'$K'/'
 # Run cola
 echo -e $"|-> Running CoLA, world size="$K
 if [ $OVERSUB = true ] 
@@ -42,7 +42,7 @@ then
         --theta $theta \
         --l1_ratio $l1_ratio \
         --lambda_ $lambda \
-        --output_dir ${OUTPUT_DIR} \
+        --output_dir ${LOG_DIR} \
         --dataset_size 'all' \
         --ckpt_freq 1 \
         --dataset $DATASET \
@@ -59,7 +59,7 @@ else
         --theta $theta \
         --l1_ratio $l1_ratio \
         --lambda_ $lambda \
-        --output_dir ${OUTPUT_DIR} \
+        --output_dir ${LOG_DIR} \
         --dataset_size 'all' \
         --ckpt_freq 1 \
         --dataset $DATASET \
@@ -68,5 +68,5 @@ else
         --use_split_dataset
 fi
 # Save result plot
-echo -e $"|-> Saving result plots to '"$SAVEDIR"/"$DATASET"/"$K"/'"
-viewresults --dataset $DATASET --k $K --savedir $SAVEDIR --no-show --save &> /dev/null;
+echo -e $"|-> Saving result plots to '"$OUT_DIR"/"$DATASET"/"$K"/'"
+viewresults --dataset $DATASET --k $K --savedir $OUT_DIR --no-show --save &> /dev/null;
