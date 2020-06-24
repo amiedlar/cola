@@ -152,7 +152,7 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
     plt.ylabel(r'$f(Ax)$')
     plt.plot(data[x_axis], data['f'], label='CoLA')
     if comp_data is not None:
-        plt.plot(comp_data[x_axis], comp_data['f'], label='CoCoA')
+        plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['f'])), label='CoCoA')
     
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
@@ -162,7 +162,7 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
     plt.ylabel(r'$g(x)$')
     plt.plot(data[x_axis], data['g'], label='CoLA')
     if comp_data is not None:
-        plt.plot(comp_data[x_axis], comp_data['g'], label='CoCoA')
+        plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['g'])), label='CoCoA')
 
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
@@ -172,7 +172,7 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
     plt.ylabel(r'$f^*(w)$')
     plt.plot(data[x_axis], data['f_conj'], label='CoLA')
     if comp_data is not None:
-        plt.plot(comp_data[x_axis], comp_data['f_conj'], label='CoCoA')
+        plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['f_conj'])), label='CoCoA')
     
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
@@ -182,7 +182,7 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
     plt.ylabel(r'$g^*(-w^TA)$')
     plt.plot(data[x_axis], data['g_conj'], label='CoLA')
     if comp_data is not None:
-        plt.plot(comp_data[x_axis], comp_data['g_conj'], label='CoCoA')
+        plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['g_conj'])), label='CoCoA')
 
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
