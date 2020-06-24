@@ -5,7 +5,7 @@ insert_dataset="mg_scale_replace"
 colatools load mg_scale \
     replace-column --scale-col 0 --scale-by 1.1 5 scale \
     replace-column --scale-col 1 --scale-by .9  4 scale \
-    replace-column --weights "-0.1 -0.2 2 0 0" 3 weights \
+    replace-column --weights "0.5 0.5 0 0 0" 3 weights \
     replace-column 2 uniform \
     split $replace_dataset
 
@@ -23,9 +23,9 @@ echo "--> Setting Parameters"
 export JOBLIB_CACHE_DIR='./cache'
 export OUTPUT_DIR='./log'
 
-global_steps=20
-l1_ratio=1.0
-lambda=1e-4
+global_steps=200
+l1_ratio=0.5
+lambda=1e-2
 theta=1e-7
 
 local_alg='ElasticNet'
@@ -55,10 +55,11 @@ do
         --dataset $dataset \
         --solvername $local_alg \
         --algoritmname $global_alg \
-        --use_split_dataset
+        --use_split_dataset \
+    	&> /dev/null;
     # Save result plot
     echo "|-> Saving result plots to 'out/"$dataset"/"$world_size"/'.."
-    viewresults --dataset $dataset --k $world_size --no-show --save;
+    viewresults --dataset $dataset --k $world_size --no-show --save &> /dev/null;
 done;
 
 # Clean up
