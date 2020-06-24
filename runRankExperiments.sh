@@ -58,4 +58,8 @@ do
         --use_split_dataset
     # Save result plot
     echo "|-> Saving result plots to 'out/"$dataset"/"$world_size"/'.."
-    viewresults --dataset $dataset --k $world_size --no-show --save
+    viewresults --dataset $dataset --k $world_size --no-show --save;
+done;
+
+# Clean up
+rm -rf ./data/$dataset
