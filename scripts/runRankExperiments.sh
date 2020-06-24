@@ -74,7 +74,7 @@ do
     log_path=$OUTPUT_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
-    mpirun -n $world_size --output-filename $log_path'mpilog' --oversubscribe run-cola \
+    mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
         --split_by 'features' \
         --max_global_steps $global_steps \
         --graph_topology $topology \
@@ -109,7 +109,7 @@ do
     log_path=$OUTPUT_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
-    mpirun -n $world_size --output-filename $log_path'mpilog' --oversubscribe run-cola \
+    mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
         --split_by 'features' \
         --max_global_steps $global_steps \
         --graph_topology $topology \
@@ -143,7 +143,7 @@ do
     log_path=$OUTPUT_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
-    mpirun -n $world_size --output-filename $log_path'mpilog' --oversubscribe run-cola \
+    mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
         --split_by 'features' \
         --max_global_steps $global_steps \
         --graph_topology $topology \
