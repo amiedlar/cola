@@ -4,7 +4,7 @@ K=${K:-6}
 OVERSUB=${OVERSUB:-false}
 
 colatools load $DATASET \
-    split --seed 1 $DATASET
+    split --k $K --seed 1 $DATASET
 
 echo -e $"|-> Setting Parameters"
 export OUTPUT_DIR='./log'
