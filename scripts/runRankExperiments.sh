@@ -45,7 +45,8 @@ echo -e $"\e[0m"
 echo -e $"Starting experiments..."
 
 echo -e $"|-> Setting Parameters"
-export OUTPUT_DIR='./log'
+OUTPUT_DIR=${OUTPUT_DIR:-'./log'}
+SAVE_DIR=${SAVE_DIR:-'out'}
 export JOBLIB_CACHE_DIR='./cache'
 
 global_steps=200
@@ -91,8 +92,8 @@ do
         --use_split_dataset \
     	> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to 'out/"$dataset"/"$world_size"/'.."
-    viewresults --dataset $dataset --k $world_size --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --save-dir $SAVE_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -126,8 +127,8 @@ do
         --use_split_dataset \
     	&> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to 'out/"$dataset"/"$world_size"/'.."
-    viewresults --dataset $dataset --k $world_size --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --save-dir $SAVE_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -160,8 +161,8 @@ do
         --use_split_dataset \
     	&> /dev/null;
     # Save result plot
-    echo -e $"|-> Saving result plots to 'out/"$dataset"/"$world_size"/'.."
-    viewresults --dataset $dataset --k $world_size --no-show --save &> /dev/null;
+    echo -e $"|-> Saving result plots to '"$SAVE_DIR"/"$dataset"/"$world_size"/'"
+    viewresults --dataset $dataset --k $world_size --save-dir $SAVE_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up

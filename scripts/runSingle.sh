@@ -7,7 +7,7 @@ colatools load $DATASET \
     split --k $K --seed 1 $DATASET
 
 echo -e $"|-> Setting Parameters"
-export OUTPUT_DIR='./log'
+OUTPUT_DIR=${OUTPUT_DIR:-'./log'}
 export JOBLIB_CACHE_DIR='./cache'
 
 global_steps=200
