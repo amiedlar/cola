@@ -4,8 +4,6 @@ replace_dataset="mg_scale_replace"
 insert_dataset="mg_scale_insert"
 control_dataset="mg_scale"
 
-export JOBLIB_CACHE_DIR='./cache'
-
 clean_dataset() {
     DATASET=$1
     ALL=${2:-false}
@@ -48,6 +46,7 @@ echo -e $"Starting experiments..."
 
 echo -e $"|-> Setting Parameters"
 export OUTPUT_DIR='./log'
+export JOBLIB_CACHE_DIR='./cache'
 
 global_steps=200
 echo -e $"|--> global_steps="$global_steps
@@ -90,7 +89,7 @@ do
         --solvername $local_alg \
         --algoritmname $global_alg \
         --use_split_dataset \
-    	&> /dev/null;
+    	> /dev/null;
     # Save result plot
     echo -e $"|-> Saving result plots to 'out/"$dataset"/"$world_size"/'.."
     viewresults --dataset $dataset --k $world_size --no-show --save &> /dev/null;
