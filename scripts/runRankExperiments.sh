@@ -1,7 +1,7 @@
 #!/bin/sh
 
-replace_dataset="mg_scale_replace1"
-insert_dataset="mg_scale_insert1"
+replace_dataset="mg_scale_replace"
+insert_dataset="mg_scale_insert"
 control_dataset="mg_scale"
 LOG_DIR=${LOG_DIR:-'./log'}
 OUT_DIR=${OUT_DIR:-'./out'}
@@ -25,19 +25,19 @@ clean_dataset $replace_dataset true;
 echo -e $"\e[2m"
 colatools load mg_scale \
     replace-column --scale-col 0 --scale-by 1.1 5 scale \
+    replace-column --scale-col 1 --scale-by .9  4 scale \
+    replace-column --weights "0.5 0.5 0 0 0" 3 weights \
+    replace-column 2 uniform \
     split $replace_dataset
-#    replace-column --scale-col 1 --scale-by .9  4 scale \
-#    replace-column --weights "0.5 0.5 0 0 0" 3 weights \
-#    replace-column 2 uniform \
 echo -e $"\e[0m"
 clean_dataset $insert_dataset true;
 echo -e $"\e[2m"
 colatools load mg_scale \
     insert-column --scale-col 0 --scale-by 1.1 scale \
+    insert-column --scale-col 1 --scale-by 0.9 scale \
+    insert-column --weights "1 2 3 4 5 6" weights \
+    insert-column uniform \
     split $insert_dataset
-#    insert-column --scale-col 1 --scale-by 0.9 scale \
-#    insert-column --weights "1 2 3 4 5 6" weights \
-#    insert-column uniform \
 echo -e $"\e[0m"
 clean_dataset $control_dataset true;
 echo -e $"\e[2m"
@@ -75,7 +75,7 @@ do
     log_path=$LOG_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
-    mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
+    mpirun -n $world_size --output-filename $log_path'mpilog' --oversubscribe run-cola \
         --split_by 'features' \
         --max_global_steps $global_steps \
         --graph_topology $topology \
@@ -110,7 +110,7 @@ do
     log_path=$LOG_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
-    mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
+    mpirun -n $world_size --output-filename $log_path'mpilog' --oversubscribe run-cola \
         --split_by 'features' \
         --max_global_steps $global_steps \
         --graph_topology $topology \
@@ -129,7 +129,7 @@ do
     	&> /dev/null;
     # Save result plot
     echo -e $"|-> Saving result plots to '"$OUT_DIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $OUT_DIR --no-show --save &> /dev/null;
+    viewresults --logdir $LOG_DIR --dataset $dataset --k $world_size --savedir $OUT_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -139,12 +139,12 @@ echo -e $"\e[1mEND: Column Replacement\e[0m\n"
 echo -e $"\e[1mSTART: Column Insertion\e[0m"
 
 dataset=$insert_dataset
-for world_size in {1..7};
+for world_size in {1..10};
 do
     log_path=$LOG_DIR'/'$dataset'/'$world_size'/'
     # Run cola
     echo -e $"|-> Running CoLA, world size="$world_size
-    mpirun -n $world_size --output-filename $log_path'mpilog'  run-cola \
+    mpirun -n $world_size --output-filename $log_path'mpilog' --oversubscribe run-cola \
         --split_by 'features' \
         --max_global_steps $global_steps \
         --graph_topology $topology \

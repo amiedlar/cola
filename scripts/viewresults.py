@@ -54,16 +54,16 @@ def plot_local_results(k, local, x_axis='i_iter', x_label='global iteration step
     plt.xlabel(x_label)
     plt.ylabel(r'$\log_{10} (local\ gap)$')
     for (i, node_data) in enumerate(local):
-        plt.plot(node_data[x_axis], np.log10(node_data['local_gap']), label=f'node {i}')
+        plt.plot(node_data[x_axis], np.log10(np.abs(node_data['local_gap'])), label=f'node {i}')
     
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
 
     fig.add_subplot(gs[1:,:])
     plt.xlabel(x_label)
-    plt.ylabel(r'$\|\| \Delta x_k \|\|$')
+    plt.ylabel(r'$\log_{10}(\|\| \Delta x_k \|\|)$')
     for (i, node_data) in enumerate(local):
-        plt.plot(node_data[x_axis], np.log10(node_data['delta_xk']), label=f'node {i}')
+        plt.plot(node_data[x_axis], np.log10(np.abs(node_data['delta_xk'])), label=f'node {i}')
 
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
@@ -78,7 +78,7 @@ def plot_local_results(k, local, x_axis='i_iter', x_label='global iteration step
     plt.xlabel(x_label)
     plt.ylabel(r'$\log_{10} (local\ gap)$')
     for i,node_data in enumerate(comp_data):
-        plt.plot(node_data[x_axis], np.log10(node_data['local_gap']), label=f'node {i}')
+        plt.plot(node_data[x_axis], np.log10(np.abs(node_data['local_gap'])), label=f'node {i}')
     
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
     leg.get_frame().set_alpha(0.5)
@@ -149,8 +149,8 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
     plt.title('Minimizer functions per iteration')
     plt.subplot(221)
     plt.xlabel(x_label)
-    plt.ylabel(r'$f(Ax)$')
-    plt.plot(data[x_axis], data['f'], label='CoLA')
+    plt.ylabel(r'$\log_{10}\|f(Ax)\|$')
+    plt.plot(data[x_axis], np.log10(np.abs(data['f'])), label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['f'])), label='CoCoA')
     
@@ -159,8 +159,8 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
 
     plt.subplot(222)
     plt.xlabel(x_label)
-    plt.ylabel(r'$g(x)$')
-    plt.plot(data[x_axis], data['g'], label='CoLA')
+    plt.ylabel(r'$\log_{10}\|g(x)\|$')
+    plt.plot(data[x_axis], np.log10(np.abs(data['g'])), label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['g'])), label='CoCoA')
 
@@ -169,8 +169,8 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
 
     plt.subplot(223)
     plt.xlabel(x_label)
-    plt.ylabel(r'$f^*(w)$')
-    plt.plot(data[x_axis], data['f_conj'], label='CoLA')
+    plt.ylabel(r'$\log_{10}\|f^*(w)\|$')
+    plt.plot(data[x_axis], np.log10(np.abs(data['f_conj'])), label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['f_conj'])), label='CoCoA')
     
@@ -179,8 +179,8 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
 
     plt.subplot(224)
     plt.xlabel(x_label)
-    plt.ylabel(r'$g^*(-w^TA)$')
-    plt.plot(data[x_axis], data['g_conj'], label='CoLA')
+    plt.ylabel(r'$\log_{10}\|g^*(-w^TA)\|$')
+    plt.plot(data[x_axis], np.log10(np.abs(data['g_conj'])), label='CoLA')
     if comp_data is not None:
         plt.plot(comp_data[x_axis], np.log10(np.abs(comp_data['g_conj'])), label='CoCoA')
 
@@ -193,10 +193,10 @@ def plot_minimizers(k, data, x_axis='i_iter', x_label='global iteration step', c
 def plot_update_and_global(local_, global_, global_y='gap', global_y_label='Global Gap', x_axis='i_iter', x_label='global iteration step'):
     fig = plt.figure()
 
-    plt.title(r'$\|\|\Delta x_k\|\|$ and ' + global_y_label + f', {len(local_)} nodes')
+    plt.title(r'$\log_{10}(\|\|\Delta x_k\|\|)$ and ' + global_y_label + f', {len(local_)} nodes')
     plt.xlabel(x_label)
     for (i, node_data) in enumerate(local_):
-        plt.plot(node_data[x_axis], np.log10(node_data['delta_xk']), label=r'$\|\| \Delta x_k \|\|$'+f', node {i}')
+        plt.plot(node_data[x_axis], np.log10(np.abs(node_data['delta_xk'])), label=r'$\|\| \Delta x_k \|\|$'+f', node {i}')
 
     plt.plot(global_[x_axis], np.log10(np.abs(global_[global_y])), label=global_y_label)
     leg = plt.legend(loc='best', ncol=1, shadow=True, fancybox=True)
