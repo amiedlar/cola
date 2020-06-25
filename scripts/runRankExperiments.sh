@@ -51,7 +51,7 @@ run_cola() {
             --solvername $local_alg \
             --algoritmname $global_alg \
             --use_split_dataset \
-            > /dev/null;
+            &> /dev/null;
         # Save result plot
         echo -e $"|---> Saving result plots to '"$OUT_DIR"/"$dataset"/"$world_size"/'"
         viewresults --dataset $dataset --k $world_size --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save &> /dev/null;
