@@ -205,8 +205,8 @@ def _split_dataset(editor, dataset, K, seed):
         file_x = os.path.join(output_folder, 'X', str(k))
         file_y = os.path.join(output_folder, 'y', str(k))
         if editor.debug:
-            print(f"Node {k}: {list(range(beg, beg+block_size+e))}")
-        joblib.dump(editor.data[:, beg:beg+block_size+e], file_x)
+            print(f"Node {k}: {indices[beg:beg+block_size+e]}")
+        joblib.dump(editor.data[:,indices[beg:beg+block_size+e]], file_x)
         joblib.dump(editor.y, file_y)
         beg += block_size+e
         extra -= e

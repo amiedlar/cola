@@ -94,7 +94,7 @@ colatools ${VERBOSE_FLAG} \
     load mg_scale \
     split $control_dataset
 echo -e $"\e[0m"
-clean_dataset $control_dataset true;
+clean_dataset $permute_dataset true;
 echo -e $"\e[2m"
 colatools ${VERBOSE_FLAG} \
     load mg_scale \
