@@ -94,7 +94,7 @@ do
     	> /dev/null;
     # Save result plot
     echo -e $"|-> Saving result plots to '"$OUT_DIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $OUT_DIR --no-show --save &> /dev/null;
+    viewresults --dataset $dataset --k $world_size --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -129,7 +129,7 @@ do
     	&> /dev/null;
     # Save result plot
     echo -e $"|-> Saving result plots to '"$OUT_DIR"/"$dataset"/"$world_size"/'"
-    viewresults --logdir $LOG_DIR --dataset $dataset --k $world_size --savedir $OUT_DIR --no-show --save &> /dev/null;
+    viewresults --logdir $LOG_DIR --dataset $dataset --k $world_size --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
@@ -163,7 +163,7 @@ do
     	&> /dev/null;
     # Save result plot
     echo -e $"|-> Saving result plots to '"$OUT_DIR"/"$dataset"/"$world_size"/'"
-    viewresults --dataset $dataset --k $world_size --savedir $OUT_DIR --no-show --save &> /dev/null;
+    viewresults --dataset $dataset --k $world_size --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save &> /dev/null;
 done;
 
 # Clean up
