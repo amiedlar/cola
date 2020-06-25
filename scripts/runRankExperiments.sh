@@ -140,6 +140,18 @@ clean_dataset $control_dataset
 echo -e $"\e[1mEND: Control\e[0m\n"
 ####################### END: Control #######################
 
+###################### START: Permute ######################
+echo -e $"\e[1mSTART: Permute\e[0m"
+
+# Run CoLA
+run_cola $permute_dataset 6
+
+# Clean up
+clean_dataset $permute_dataset
+
+echo -e $"\e[1mEND: Permute\e[0m\n"
+####################### END: Permute #######################
+
 #################### START: Replacement ####################
 echo -e $"\e[1mSTART: Column Replacement\e[0m"
 
