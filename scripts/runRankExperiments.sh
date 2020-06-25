@@ -1,7 +1,7 @@
 #!/bin/sh
 
-replace_dataset="mg_scale_replace"
-insert_dataset="mg_scale_insert"
+replace_dataset="mg_scale_replace1"
+insert_dataset="mg_scale_insert1"
 control_dataset="mg_scale"
 LOG_DIR=${LOG_DIR:-'./log'}
 OUT_DIR=${OUT_DIR:-'./out'}
@@ -25,19 +25,19 @@ clean_dataset $replace_dataset true;
 echo -e $"\e[2m"
 colatools load mg_scale \
     replace-column --scale-col 0 --scale-by 1.1 5 scale \
-    replace-column --scale-col 1 --scale-by .9  4 scale \
-    replace-column --weights "0.5 0.5 0 0 0" 3 weights \
-    replace-column 2 uniform \
     split $replace_dataset
+    #replace-column --scale-col 1 --scale-by .9  4 scale \
+    #replace-column --weights "0.5 0.5 0 0 0" 3 weights \
+    #replace-column 2 uniform \
 echo -e $"\e[0m"
 clean_dataset $insert_dataset true;
 echo -e $"\e[2m"
 colatools load mg_scale \
     insert-column --scale-col 0 --scale-by 1.1 scale \
-    insert-column --scale-col 1 --scale-by 0.9 scale \
-    insert-column --weights "1 2 3 4 5 6" weights \
-    insert-column uniform \
     split $insert_dataset
+    #insert-column --scale-col 1 --scale-by 0.9 scale \
+    #insert-column --weights "1 2 3 4 5 6" weights \
+    #insert-column uniform \
 echo -e $"\e[0m"
 clean_dataset $control_dataset true;
 echo -e $"\e[2m"
