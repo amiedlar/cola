@@ -18,6 +18,12 @@ if [ $OVERSUB = true ]; then
 else
     OVERSUB_FLAG=''
 fi
+VERBOSE=${V:-false}
+if [ $VERBOSE = true ]; then
+    VERBOSE_FLAG='-v';
+else
+    VERBOSE_FLAG=''
+fi
 
 run_cola() {
     dataset=$1
@@ -59,11 +65,13 @@ echo -e $"\e[1mSTART: Load Data\e[0m"
 replace_dataset="mg_scale_replace1"
 insert_dataset="mg_scale_insert1"
 control_dataset="mg_scale"
+permute_dataset="mg_scale_permute"
 
 rm -rf cache
 clean_dataset $replace_dataset true;
 echo -e $"\e[2m"
-colatools load mg_scale \
+colatools ${VERBOSE_FLAG} \
+    load mg_scale \
     replace-column 5 uniform \
     split $replace_dataset
     # replace-column --scale-col 0 --scale-by 1.1 5 scale \
@@ -72,7 +80,8 @@ colatools load mg_scale \
 echo -e $"\e[0m"
 clean_dataset $insert_dataset true;
 echo -e $"\e[2m"
-colatools load mg_scale \
+colatools ${VERBOSE_FLAG}\
+    load mg_scale \
     insert-column uniform \
     split $insert_dataset
     # insert-column --scale-col 0 --scale-by 1.1 scale \
@@ -81,8 +90,15 @@ colatools load mg_scale \
 echo -e $"\e[0m"
 clean_dataset $control_dataset true;
 echo -e $"\e[2m"
-colatools load mg_scale \
+colatools ${VERBOSE_FLAG} \
+    load mg_scale \
     split $control_dataset
+echo -e $"\e[0m"
+clean_dataset $control_dataset true;
+echo -e $"\e[2m"
+colatools ${VERBOSE_FLAG} \
+    load mg_scale \
+    split --seed 42 $permute_dataset
 echo -e $"\e[0m\e[1mEND: Load Data\e[0m\n"
 ###################### END: Load Data ######################
 

@@ -7,7 +7,8 @@ import click
 
 
 class RankEditor(object):
-    def __init__(self, indir=None, outdir=False):
+    def __init__(self, indir=None, outdir=None, debug=False):
+        self.debug = debug
         self.indir = os.path.abspath(indir or '../data')
         self.outdir = os.path.abspath(outdir or 'data')
         self.data = None
@@ -20,11 +21,12 @@ pass_editor = click.make_pass_decorator(RankEditor)
 @click.option('--basepath', default='.')
 @click.option('--indir', default=os.path.join('..', 'data'))
 @click.option('--outdir', default='data')
+@click.option('-v', is_flag=True)
 @click.pass_context
-def cli(ctx, basepath, indir, outdir):
+def cli(ctx, basepath, indir, outdir, v):
     indir = os.path.join(basepath, indir)
     outdir = os.path.join(basepath, outdir)
-    ctx.obj = RankEditor(indir, outdir) 
+    ctx.obj = RankEditor(indir, outdir, v) 
 
 @cli.command('load')
 @click.argument('dataset')
@@ -44,7 +46,8 @@ def load(editor, dataset, confirm):
     try:
         editor.data, editor.y = load_svmlight_file(path)
         editor.data = editor.data.tocsc()
-        print(f"Loaded '{dataset}', shape {editor.data.shape}")
+        if editor.debug:
+            print(f"Loaded '{dataset}', shape {editor.data.shape}")
         return
     except Exception as e:
         print(e)
@@ -84,7 +87,8 @@ def replace_column(editor, col, scheme, scale_col, scale_by, weights):
     new_col = editor.data * weights
     from scipy.sparse import csc_matrix
     editor.data[:,col] = csc_matrix(new_col.reshape((n_row,1)))
-    print(f"Replaced A[:,{col}] with "+debug_str)
+    if editor.debug:
+        print(f"Replaced A[:,{col}] with "+debug_str)
     return
 
 @cli.command('insert-columns')
@@ -144,7 +148,8 @@ def _insert_column(editor, scheme, scale, scale_by, weights):
     new_col = editor.data * weights
     new_col = new_col.reshape((n_row,1))
     editor.data = csc_matrix(np.concatenate((editor.data.todense(), new_col), axis=1))
-    print("Inserted new column as "+debug_str)
+    if editor.debug:
+        print("Inserted new column as "+debug_str)
     return
 
 @cli.command('save-svm')
@@ -158,10 +163,12 @@ def save_svm(editor, filename, overwrite):
         print(f"Error: '{path}' already exists, use `--overwrite` to save anyway")
         return
     elif os.path.exists(path):
-        print(f"Warning: '{path}' already exists, overwriting")
+        if editor.debug:
+            print(f"Warning: '{path}' already exists, overwriting")
         os.remove(path)
     dump_svmlight_file(editor.data, editor.y, path)
-    print(f"Data with shape {editor.data.shape} saved to '{path}'")
+    if editor.debug:
+        print(f"Data with shape {editor.data.shape} saved to '{path}'")
     return
 
 @cli.command('split')
@@ -187,19 +194,26 @@ def _split_dataset(editor, dataset, K, seed):
     if seed is not None:
         np.random.seed(seed)
         np.random.shuffle(indices)
-        print(f"randomized indices: {indices}")
-    block_size = int(np.ceil(n_features / K))
+        if editor.debug:
+            print(f"randomized indices: {indices}")
+    block_size = int(n_features // K)
+    extra = int(n_features % K)
 
     beg = 0
     for k in range(K):
+        e = int(extra>0)
         file_x = os.path.join(output_folder, 'X', str(k))
         file_y = os.path.join(output_folder, 'y', str(k))
-        joblib.dump(editor.data[:, beg:beg+block_size], file_x)
+        if editor.debug:
+            print(f"Node {k}: {list(range(beg, beg+block_size+e))}")
+        joblib.dump(editor.data[:, beg:beg+block_size+e], file_x)
         joblib.dump(editor.y, file_y)
-        beg += block_size
+        beg += block_size+e
+        extra -= e
 
     joblib.dump(indices, os.path.join(output_folder, 'indices'))
-    print(f"Splits for world_size {K} stored in '{output_folder}'")
+    if editor.debug:
+        print(f"Splits for world_size {K} stored in '{output_folder}'")
 
 
 if __name__ == "__main__":
