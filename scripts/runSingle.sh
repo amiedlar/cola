@@ -7,24 +7,25 @@ colatools load $DATASET \
     split --K $K --seed 1 $DATASET
 
 echo -e $"|-> Setting Parameters"
+
 LOG_DIR=${LOG_DIR:-'./log'}
-OUT_DIR=${OUT_DIR:-'out'}
+OUT_DIR=${OUT_DIR:-'./out'}
 export JOBLIB_CACHE_DIR='./cache'
 
-global_steps=200
-echo -e $"|--> global_steps="$global_steps
-l1_ratio=0.5
-echo -e $"|--> l1_ratio="$l1_ratio
-lambda=1e-2
-echo -e $"|--> lambda="$lambda
-theta=1e-7
-echo -e $"|--> theta="$theta
-topology='complete'
-echo -e $"|--> graph_topology="$topology
+global_steps=${global_steps:-200}
+echo -e $"|---> global_steps="$global_steps
+l1_ratio=${l1_ratio:-0.5}
+echo -e $"|---> l1_ratio="$l1_ratio
+lambda=${lambda:-1e-4}
+echo -e $"|---> lambda="$lambda
+theta=${theta:-1e-7}
+echo -e $"|---> theta="$theta
+topology=${topology:-complete}
+echo -e $"|---> graph_topology="$topology
 
-local_alg='ElasticNet'
+local_alg=${local_alg:-ElasticNet}
 echo -e $"|-> Using local algorithm "$local_alg
-global_alg='cola'
+global_alg=${global_alg:-cola}
 echo -e $"|-> Using global algorithm "$global_alg
 
 

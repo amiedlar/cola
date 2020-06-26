@@ -28,8 +28,9 @@ fi
 run_cola() {
     dataset=$1
     n=$2
+    start=${3:-1}
 
-    for (( world_size=1; world_size<=$n; world_size++ ))
+    for (( world_size=$start; world_size<=$n; world_size++ ))
     do
         log_path=$LOG_DIR'/'$dataset'/'$world_size'/'
         # Run cola
@@ -47,6 +48,7 @@ run_cola() {
             --output_dir ${LOG_DIR} \
             --dataset_size 'all' \
             --ckpt_freq 1 \
+            --local_iters 10 \
             --dataset $dataset \
             --solvername $local_alg \
             --algoritmname $global_alg \
@@ -71,7 +73,7 @@ rm -rf cache
 clean_dataset $replace_dataset true;
 echo -e $"\e[2m"
 colatools ${VERBOSE_FLAG} \
-    load mg_scale \
+    load $control_dataset \
     replace-column 5 uniform \
     split $replace_dataset
     # replace-column --scale-col 0 --scale-by 1.1 5 scale \
@@ -81,7 +83,7 @@ echo -e $"\e[0m"
 clean_dataset $insert_dataset true;
 echo -e $"\e[2m"
 colatools ${VERBOSE_FLAG}\
-    load mg_scale \
+    load $control_dataset \
     insert-column uniform \
     split $insert_dataset
     # insert-column --scale-col 0 --scale-by 1.1 scale \
@@ -91,13 +93,13 @@ echo -e $"\e[0m"
 clean_dataset $control_dataset true;
 echo -e $"\e[2m"
 colatools ${VERBOSE_FLAG} \
-    load mg_scale \
+    load $control_dataset \
     split $control_dataset
 echo -e $"\e[0m"
 clean_dataset $permute_dataset true;
 echo -e $"\e[2m"
 colatools ${VERBOSE_FLAG} \
-    load mg_scale \
+    load $control_dataset \
     split --seed 42 $permute_dataset
 echo -e $"\e[0m\e[1mEND: Load Data\e[0m\n"
 ###################### END: Load Data ######################
@@ -115,7 +117,7 @@ global_steps=${global_steps:-200}
 echo -e $"|---> global_steps="$global_steps
 l1_ratio=${l1_ratio:-0.5}
 echo -e $"|---> l1_ratio="$l1_ratio
-lambda=${lambda:-1e-2}
+lambda=${lambda:-1e-4}
 echo -e $"|---> lambda="$lambda
 theta=${theta:-1e-7}
 echo -e $"|---> theta="$theta
@@ -131,7 +133,7 @@ echo
 ###################### START: Control ######################
 echo -e $"\e[1mSTART: Control\e[0m"
 
-# Run CoLA
+# Run CoLA 
 run_cola $control_dataset 6
 
 # Clean up
@@ -144,7 +146,7 @@ echo -e $"\e[1mEND: Control\e[0m\n"
 echo -e $"\e[1mSTART: Permute\e[0m"
 
 # Run CoLA
-run_cola $permute_dataset 6
+run_cola $permute_dataset 16 8
 
 # Clean up
 clean_dataset $permute_dataset
@@ -156,7 +158,7 @@ echo -e $"\e[1mEND: Permute\e[0m\n"
 echo -e $"\e[1mSTART: Column Replacement\e[0m"
 
 # Run CoLA
-run_cola $replace_dataset 6
+run_cola $replace_dataset 16 8
 
 # Clean up
 clean_dataset $replace_dataset
@@ -168,7 +170,7 @@ echo -e $"\e[1mEND: Column Replacement\e[0m\n"
 echo -e $"\e[1mSTART: Column Insertion\e[0m"
 
 # Run CoLA
-run_cola $insert_dataset 7
+run_cola $insert_dataset 17 8
 
 # Clean up
 clean_dataset $insert_dataset
