@@ -193,6 +193,21 @@ def plot_minimizers(k, data, xaxis='i_iter', xlabel='global iteration step', com
     fspec.draw()
     return fspec.fig
 
+def plot_minimizers_exact(k, data, xaxis='i_iter', xlabel='global iteration step', comp_data=None):
+    data1 = data.copy()
+    data1.
+    fspec = FigSpec(f'Minimizer Values, {k} nodes', data=data, comp_data=data)
+    f = create_PlotSpec('f', xaxis=xaxis, xlabel=xlabel)
+    g = create_PlotSpec('g', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(f, label='f', comp_spec=g, comp_label='g', sidebyside=True)
+
+    f_conj = create_PlotSpec('f_conj', xaxis=xaxis, xlabel=xlabel)
+    g_conj = create_PlotSpec('g_conj', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(f_conj, label='f*', comp_spec=g_conj, comp_label='g*', sidebyside=True)
+
+    fspec.draw()
+    return fspec.fig
+
 def plot_update_and_global(local_, global_, global_y='gap', global_ylabel='Global Gap', xaxis='i_iter', xlabel='global iteration step'):
     fspec = FigSpec(r'$\log_{10} \|\|\Delta x_k\|\|$ and ' + global_ylabel + f', {len(local_)} nodes')
     gap = PlotSpec('', 'gap', '', xaxis=xaxis, xlabel=xlabel)
@@ -247,7 +262,6 @@ def plot_results(k, logdir, dataset, compare, save, show, savedir):
     comp_res = None
     local_results = [pd.read_csv(os.path.join(log_path,f'{i}result.csv')).loc[1:] for i in range(k)]
     global_results = pd.read_csv(os.path.join(log_path, 'result.csv')).loc[1:]
-
     if showres:
         ref_weights = np.load(weights_path, allow_pickle=True)
         ref_norm = np.linalg.norm(ref_weights)

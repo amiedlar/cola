@@ -113,9 +113,14 @@ class Monitor(object):
         K = comm.get_world_size()
         wk = self.solver.grad_f(Akxk)
         record['delta_xk'] = norm(delta_xk) if delta_xk is not None else np.nan
+        record['mag_xk'] = norm(xk, 2)
+        record['mag_vk'] = norm(vk, 2)
+        record['mag_Akxk'] = norm(Akxk, 2)
         record['cert_gap'] = Akxk @ wk
         L = 1/self.solver.theta
         record['cert_cv'] = norm(wk - self.solver.grad_f(vk), 2) 
+        record['cv2'] = float(norm(vk - Akxk, 2) ** 2/ norm(vk,2)**2)
+
         self.records.append(record)
 
         print("Iter {i_iter:5}, Time {time:10.5e}: delta_xk={delta_xk:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))

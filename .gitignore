@@ -109,4 +109,5 @@ cache/
 .vscode/
 *.c
 log/
+log-*/
 mpilog/
