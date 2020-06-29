@@ -17,7 +17,7 @@ class Monitor(object):
     * save weight file and log files if specified;
     """
 
-    def __init__(self, solver, output_dir, ckpt_freq, exit_time=None, split_by='samples', mode='local', alg='cola'):
+    def __init__(self, solver, output_dir, ckpt_freq, exit_time=None, split_by='samples', mode='local', alg='cola', Ak_test=None, y_test=None, verbose=1):
         """
         Parameters
         ----------
@@ -36,6 +36,10 @@ class Monitor(object):
              * `global` mode logs duality gap of the whole program. It takes more time to compute.
         """
         assert isinstance(solver, CoCoASubproblemSolver)
+        self.Ak_test = Ak_test
+        self.y_test = y_test
+        self.do_prediction_tests = self.Ak_test is not None and self.y_test is not None
+
         self.rank = comm.get_rank()
         self.world_size = comm.get_world_size()
 
@@ -46,6 +50,8 @@ class Monitor(object):
         self.running_time = 0
         self.previous_time = time.time()
         self.exit_time = exit_time or np.inf
+
+        self.verbose = verbose
 
         self.records = []
         self.records_l = []
@@ -86,9 +92,10 @@ class Monitor(object):
             self.records = self.records_g
             self._log_global(vk, Akxk, xk, i_iter, solver)
             self.records_g = self.records
-            print(f"[{comm.get_rank()}] Certificate, Iter {self.records[-1]['i_iter']}: "
-                  f"global_gap={self.records[-1]['gap']:10.5e}; "
-                  f"local_gap={self.records_l[-1]['cert_gap']:10.5e}, local_cv={self.records_l[-1]['cert_cv']:10.5e}")
+            if self.verbose >= 2:
+                print(f"[{comm.get_rank()}] Certificate, Iter {self.records[-1]['i_iter']}: "
+                    f"global_gap={self.records[-1]['gap']:10.5e}; "
+                    f"local_gap={self.records_l[-1]['cert_gap']:10.5e}, local_cv={self.records_l[-1]['cv2']:10.5e}")
         else:
             raise NotImplementedError("[local, global, all, None] are expected mode, got {}".format(self.mode))
 
@@ -119,11 +126,11 @@ class Monitor(object):
         record['cert_gap'] = Akxk @ wk
         L = 1/self.solver.theta
         record['cert_cv'] = norm(wk - self.solver.grad_f(vk), 2) 
-        record['cv2'] = float(norm(vk - Akxk, 2) ** 2/ norm(vk,2)**2)
 
         self.records.append(record)
 
-        print("Iter {i_iter:5}, Time {time:10.5e}: delta_xk={delta_xk:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
+        if self.verbose >= 2:
+            print("Iter {i_iter:5}, Time {time:10.5e}: delta_xk={delta_xk:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
 
     def _log_global(self, vk, Akxk, xk, i_iter, solver):
         record = {}
@@ -142,6 +149,8 @@ class Monitor(object):
         record['wy'] = float(w @ self.solver.y)
         # Compute squared norm of consensus violation
         record['cv2'] = float(norm(vk - v, 2) ** 2)
+        if self.mode == 'all':
+            self.records_l[-1]['cv2'] = record['cv2']
         # Compute the value of minimizer objective
         record['mag_xk'] = norm(xk,2)
         record['mag_v'] = float(norm(v,2) ** 2)
@@ -172,12 +181,26 @@ class Monitor(object):
         # Duality gap of the gloabl problem
         record['gap'] = record['D'] + record['P']
 
+        if self.do_prediction_tests:
+            y_predict = self.Ak_test*xk
+            y_predict = comm.all_reduce(np.asarray(y_predict), op='SUM')
+            y_test_avg = np.average(self.y_test)
+            record['n_train'] = self.solver.y.shape[0]
+            record['n_test'] = self.y_test.shape[0]
+            record['rmse'] = np.sqrt(np.average((y_predict - self.y_test)**2))
+            record['r2'] = 1.0 - np.sum((y_predict - self.y_test)**2)/np.sum((self.y_test - y_test_avg)**2)
+            record['max_rel'] = np.amax(np.abs(y_predict - self.y_test)/self.y_test)
+            record['l2_rel'] = np.linalg.norm(self.y_test-y_predict, 2)/np.linalg.norm(self.y_test, 2)
+
         self.records.append(record)
 
         if self.rank == 0:
-            print('Iter {i_iter:5} DEBUG: res={res2:10.3e}, w*y={wy:10.3e}, f*={f*:10.3e}'.format(**record)) 
-            print("Iter {i_iter:5}, Time {time:10.5e}: gap={gap:10.3e}, P={P:10.3e}, D={D:10.3e}, f={f:10.3e}, "
+            if self.verbose >= 3:
+                print('Iter {i_iter:5} DEBUG: res={res2:10.3e}, w*y={wy:10.3e}, f*={f*:10.3e}'.format(**record)) 
+            if self.verbose >= 2:
+                print("Iter {i_iter:5}, Time {time:10.5e}: gap={gap:10.3e}, P={P:10.3e}, D={D:10.3e}, f={f:10.3e}, "
                   "g={g:10.3e}, f_conj={f_conj:10.3e}, g_conj={g_conj:10.3e}".format(**record))
+                
 
     def save(self, Akxk, xk, weightname=None, logname=None):
         rank = self.rank
@@ -186,11 +209,13 @@ class Monitor(object):
                 self.records = self.records_g
                 logfile = os.path.join(self.output_dir, f'{rank}'+logname)
                 pd.DataFrame(self.records_l).to_csv(logfile)
-                print("Data has been save to {} on node {}".format(logfile, rank))
+                if self.verbose >= 2:
+                    print("Data has been save to {} on node {}".format(logfile, rank))
             if rank == 0:
                 logfile = os.path.join(self.output_dir, logname)
                 pd.DataFrame(self.records).to_csv(logfile)
-                print("Data has been save to {} on node 0".format(logfile))
+                if self.verbose >= 2:
+                    print("Data has been save to {} on node 0".format(logfile))
 
         if weightname:
             if self.split_by_samples:
@@ -206,10 +231,44 @@ class Monitor(object):
 
                 weight = np.zeros(sum(size))
                 weight[sum(size[:rank]): sum(size[:rank]) + len(xk)] = np.array(xk)
-                # print(f'node {rank} weights: {weight}')
+                if self.verbose >= 3:
+                    print(f'node {rank} weights: {weight}')
                 weight = comm.reduce(weight, root=0, op='SUM')
 
             if rank == 0:
                 weightfile = os.path.join(self.output_dir, weightname)
                 weight.dump(weightfile)
-                print("Weight has been save to {} on node 0".format(weightfile))
+                if self.verbose >= 2:
+                    print("Weight has been save to {} on node 0".format(weightfile))
+
+    def show_test_statistics(self, xk_final, n_train, Ak_test=None, y_test=None):
+        if Ak_test is None:
+            Ak_test = self.Ak_test
+        if y_test is None:
+            y_test = self.y_test
+        if Ak_test is None or y_test is None:
+            raise TypeError('Ak_test and y_test must not be None')
+
+        n_test = y_test.shape[0]
+        
+        if self.mode in ['global', 'all']:
+            rmse = self.records_g[-1]['rmse']
+            r2 = self.records_g[-1]['r2']
+            max_rel = self.records_g[-1]['max_rel']
+            l2_rel = self.records_g[-1]['l2_rel']
+        else:
+            y_predict = Ak_test*xk_final
+            y_predict = comm.all_reduce(np.asarray(y_predict), op='SUM')
+
+            y_test_avg = np.average(y_test)
+            rmse = np.sqrt(np.average((y_predict - y_test)**2))
+            r2 = 1.0 - np.sum((y_predict - y_test)**2)/np.sum((y_test - y_test_avg)**2)
+            max_rel = np.amax(np.abs(y_predict - y_test)/y_test)
+            l2_rel = np.linalg.norm(y_test-y_predict, 2)/np.linalg.norm(y_test, 2)
+
+        if self.verbose >= 1 and comm.get_rank() == 0:
+            print(f'|-> Test Statistics ({n_train}/{n_test}/{n_train + n_test}): ')
+            print(f'|---> max. rel. error = {max_rel}')
+            print(f'|--->   rel. L2 error = {l2_rel}')
+            print(f'|--->            RMSE = {rmse}')
+            print(f'|--->             R^2 = {r2}')

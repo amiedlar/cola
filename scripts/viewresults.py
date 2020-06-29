@@ -125,6 +125,14 @@ def create_PlotSpec(yaxis, xaxis='i_iter', xlabel='Iteration Count'):
         return PlotSpec('f*', 'f_conj', r'$\log_{10}\|f^*(w)\|$', xaxis=xaxis, xlabel=xlabel)
     if yaxis=='g_conj':
         return PlotSpec('g*', 'g_conj', r'$\log_{10}\|g^*(-w^TA)\|$', xaxis=xaxis, xlabel=xlabel)
+    if yaxis=='rmse':
+        return PlotSpec('Root Mean Squared Error', yaxis, r'rmse', xaxis=xaxis, xlabel=xlabel, log_y=False)
+    if yaxis=='r2':
+        return PlotSpec('$R^2$', yaxis, r'$R^2$', xaxis=xaxis, xlabel=xlabel, log_y=False)
+    if yaxis=='max_rel':
+        return PlotSpec('Maximum Relative Error', yaxis, r'max relative error', xaxis=xaxis, xlabel=xlabel, log_y=False)
+    if yaxis=='l2_rel':
+        return PlotSpec('Relative Error, 2-Norm', yaxis, r'$\|\|y^{pred}-y^{test}\|\|_2 / \|\|y^{test}\|\|_2$', xaxis=xaxis, xlabel=xlabel, log_y=False)
 
 def plot_residual(k, res, comp_res=None):
     figspec = FigSpec(f'Residuals, {k} nodes')
@@ -195,14 +203,17 @@ def plot_minimizers(k, data, xaxis='i_iter', xlabel='global iteration step', com
 
 def plot_minimizers_exact(k, data, xaxis='i_iter', xlabel='global iteration step', comp_data=None):
     data1 = data.copy()
-    data1.
-    fspec = FigSpec(f'Minimizer Values, {k} nodes', data=data, comp_data=data)
-    f = create_PlotSpec('f', xaxis=xaxis, xlabel=xlabel)
-    g = create_PlotSpec('g', xaxis=xaxis, xlabel=xlabel)
+    data1[:,'f'] = data[-1,'f'] - data[:,'f']
+    data1[:,'g'] = data[-1,'g'] - data[:,'g']
+    data1[:,'f_conj'] = data[-1,'f_conj'] - data[:,'f_conj']
+    data1[:,'g_conj'] = data[-1,'g_conj'] - data[:,'g_conj']
+    fspec = FigSpec(f'Minimizer Values, distance from minimum, {k} nodes', data=data1, comp_data=data1)
+    f = PlotSpec('f', 'f', r'$\log_{10}\|f(Ax^*) - f(Ax)\|$', xaxis=xaxis, xlabel=xlabel)
+    g = PlotSpec('g', 'g', r'$\log_{10}\|g(x^*) - g(x)\|$', xaxis=xaxis, xlabel=xlabel)
     fspec.add_plot(f, label='f', comp_spec=g, comp_label='g', sidebyside=True)
 
     f_conj = create_PlotSpec('f_conj', xaxis=xaxis, xlabel=xlabel)
-    g_conj = create_PlotSpec('g_conj', xaxis=xaxis, xlabel=xlabel)
+    g_conj = PlotSpec('g*', 'g_conj', r'$\log_{10}\|g^*(-w^TA)\|$', xaxis=xaxis, xlabel=xlabel)
     fspec.add_plot(f_conj, label='f*', comp_spec=g_conj, comp_label='g*', sidebyside=True)
 
     fspec.draw()
@@ -219,6 +230,21 @@ def plot_update_and_global(local_, global_, global_y='gap', global_ylabel='Globa
     fspec.draw()
     return fspec.fig
 
+def plot_test_statistics(k, data, xaxis='i_iter', xlabel='global iteration step', comp_data=None):  
+    n_train, n_test = np.max(data.loc[:,'n_train']), np.max(data.loc[:,'n_test'])
+    fspec = FigSpec(f'Prediction Test Statistics ({n_train}/{n_test}/{n_train+n_test}), {k} nodes', data=data, comp_data=data)
+    rmse = create_PlotSpec('rmse', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(rmse)
+    r2 = create_PlotSpec('r2', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(r2)
+
+    l2_rel = create_PlotSpec('l2_rel', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(l2_rel)
+    max_rel = create_PlotSpec('max_rel', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(max_rel)
+
+    fspec.draw()
+    return fspec.fig
 
 @click.command()
 @click.option('--k', type=click.INT, default=None, help='Number of mpi processes')
@@ -274,7 +300,6 @@ def plot_results(k, logdir, dataset, compare, save, show, savedir):
                 for (i, wf) in [(i, os.path.join(comp_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)]
                 if os.path.exists(wf)]
         res = pd.DataFrame([*res], columns=['i_iter', 'res'])
-        print(res)
         if comp_res is not None: 
             comp_res = pd.DataFrame([*comp_res], columns=['i_iter', 'res'])
 
@@ -311,6 +336,10 @@ def plot_results(k, logdir, dataset, compare, save, show, savedir):
 
     fig = plot_update_and_global(local_results, global_results)
     saveorshow(fig, 'update-and-gap.png')
+
+    if 'n_test' in global_results:
+        fig = plot_test_statistics(k, global_results, comp_data=comp_global)
+        saveorshow(fig, 'test_statistics.png')
 
     if showres:
         fig = plot_update_and_global(local_results, res, global_y='res', global_ylabel=r'$\log_{10} (\|\|x_k - x^*\|\|/\|\|x^*\|\|)$')

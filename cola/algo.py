@@ -70,8 +70,9 @@ def cola(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, graph, 
             rank, local_lookups, local_vs)
 
         if monitor.log(averaged_v, Akxk, xk, i_iter, localsolver, delta_x):
-            print('break iterations here.')
-            #break
+            if monitor.verbose >= 2:
+                print('break iterations here.')
+            break
 
         if (i_iter % monitor.ckpt_freq) == 0:
             monitor.save(
@@ -113,8 +114,9 @@ def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monito
         v += gamma * delta_v
 
         if monitor.log(v, Ak*xk, xk, i_iter, localsolver, delta_xk):
-            print('break iterations here.')
-            #break
+            if monitor.verbose >= 2:
+                print('break iterations here.')
+            break
 
         if (i_iter % monitor.ckpt_freq) == 0:
             monitor.save(v, xk, weightname='weight_epoch_{}.npy'.format(i_iter))

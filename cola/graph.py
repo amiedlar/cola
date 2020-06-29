@@ -75,7 +75,8 @@ class CompleteGraph(UndirectedGraph):
 
 
 class RingGraph(UndirectedGraph):
-    def __init__(self, n):
+    def __init__(self, n, verbose=1):
+        self.verbose = verbose
         self.n = n
         self._data, self._beta = self._compute_beta(n)
 
@@ -198,11 +199,12 @@ class NonUniformWeightRingGraph(RingGraph):
         node_{i-1} : (1 + x) / 2
     """
 
-    def __init__(self, n, local_percent):
+    def __init__(self, n, local_percent, verbose=1):
         self.w_local = local_percent
         self.w_neigh = (1 - local_percent) / 2
-        super(NonUniformWeightRingGraph, self).__init__(n)
-        print("beta", self.beta)
+        super(NonUniformWeightRingGraph, self).__init__(n, verbose)
+        if self.verbose >= 2:
+            print("beta", self.beta)
 
     def _compute_beta(self, n):
         assert n > 2
@@ -472,7 +474,7 @@ def define_graph_topology(n_nodes, graph_topology,  **args):
         graph = TimeVaryingCompleteGraph(n_nodes, args['network_stability'])
     elif graph_topology == 'non_uniform_weight_ring_graph':
         local_weight = args['local_weight']
-        graph = NonUniformWeightRingGraph(n_nodes, local_weight)
+        graph = NonUniformWeightRingGraph(n_nodes, local_weight, verbose=args['verbose'])
     elif graph_topology == 'connected_cycle':
         n_connectivity = args['n_connectivity']
         graph = NConnectedCycleGraph(n_nodes, n_connectivity, )

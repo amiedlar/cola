@@ -16,7 +16,7 @@ def maybe_cache(func):
     if 'JOBLIB_CACHE_DIR' in os.environ:
         cachedir = os.environ['JOBLIB_CACHE_DIR']
         memory = Memory(cachedir=cachedir, verbose=0)
-        print("Loading dataset from cached memory in {}.".format(cachedir))
+        # print("Loading dataset from cached memory in {}.".format(cachedir))
 
         func_wrapper = memory.cache(func)
     else:
@@ -36,7 +36,7 @@ def dist_coord_selection(rank, world_size, max_index, n_coords=None):
 
 
 @maybe_cache
-def dist_row_read_one(rank, world_size, n_blob, n_features, filename, zero_based, length=10000, datapoints=0):
+def dist_row_read_one(rank, world_size, n_blob, n_features, filename, zero_based, length=10000, datapoints=0, verbose=1):
     X_train, y_train = [], []
     rank_coords = []
     total_data_loaded = 0
@@ -57,8 +57,9 @@ def dist_row_read_one(rank, world_size, n_blob, n_features, filename, zero_based
         total_data_loaded += X.shape[0]
         if total_data_loaded >= n_blob:
             break
-
-        print("Rank {:2}: {} : {:.3f}".format(rank, total_data_loaded,  total_data_loaded / n_blob))
+        
+        if verbose >= 3:
+            print("Rank {:2}: {} : {:.3f}".format(rank, total_data_loaded,  total_data_loaded / n_blob))
         offset += length
 
     X_train = vstack(X_train)
@@ -67,7 +68,7 @@ def dist_row_read_one(rank, world_size, n_blob, n_features, filename, zero_based
 
 
 @maybe_cache
-def dist_col_read_one(rank, world_size, n_blob, n_features, filename, zero_based, length=100, datapoints=0):
+def dist_col_read_one(rank, world_size, n_blob, n_features, filename, zero_based, length=100, datapoints=0, verbose=1):
     rank_coords = dist_coord_selection(rank, world_size, n_features, datapoints)
 
     offset = 0
@@ -86,8 +87,8 @@ def dist_col_read_one(rank, world_size, n_blob, n_features, filename, zero_based
             X_train = vstack((X_train, X[:, rank_coords]))
             y_train = np.concatenate((y_train, y))
             break
-
-        print("Rank {:2}: {} : {:.3f}".format(rank, X_train.shape[0],  X_train.shape[0] / n_blob))
+        if verbose >= 3:
+            print("Rank {:2}: {} : {:.3f}".format(rank, X_train.shape[0],  X_train.shape[0] / n_blob))
 
         offset += length
 
@@ -95,7 +96,7 @@ def dist_col_read_one(rank, world_size, n_blob, n_features, filename, zero_based
 
 
 @maybe_cache
-def dist_col_read(rank, world_size, n_blob, n_features, filenames):
+def dist_col_read(rank, world_size, n_blob, n_features, filenames, verbose=1):
     """Read svmlight files in a distributed way.
 
     Split the dataset by columns.
@@ -126,7 +127,8 @@ def dist_col_read(rank, world_size, n_blob, n_features, filenames):
 
     X_train, y_train = None, None
     for filename in filenames:
-        print("Rank {:3} is loading {}".format(rank, filename))
+        if verbose >= 3:
+            print("Rank {:3} is loading {}".format(rank, filename))
         X, y = load_svmlight_file(filename, n_features=n_features, length=-1)
 
         if X_train is None:
@@ -143,7 +145,7 @@ def dist_col_read(rank, world_size, n_blob, n_features, filenames):
 
 
 @maybe_cache
-def dist_row_read(rank, world_size, n_blob, n_features, filenames):
+def dist_row_read(rank, world_size, n_blob, n_features, filenames, verbose=1):
     """Read svmlight files in a distributed way.
 
     Split the dataset by rows.
@@ -175,7 +177,8 @@ def dist_row_read(rank, world_size, n_blob, n_features, filenames):
     total_data_loaded = 0
 
     for filename in filenames:
-        print("Rank {:3} is loading {}".format(rank, filename))
+        if verbose >= 3:
+            print("Rank {:3} is loading {}".format(rank, filename))
         X, y = load_svmlight_file(filename, n_features=n_features, length=-1)
 
         if (total_data_loaded + X.shape[0] >= n_blob):
@@ -197,7 +200,7 @@ def dist_row_read(rank, world_size, n_blob, n_features, filenames):
 
 class Epsilon(object):
     @staticmethod
-    def dist_read(rank, world_size, file, percent=0.1, split_by='samples', random_state=42, datapoints=None):
+    def dist_read(rank, world_size, file, percent=0.1, split_by='samples', random_state=42, datapoints=None, verbose=1):
         np.random.seed(random_state)
         n_blob = int(400000 * percent)
         n_features = 2000
@@ -216,7 +219,7 @@ class Epsilon(object):
 
 class URL(object):
     @staticmethod
-    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None):
+    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None, verbose=1):
         np.random.seed(random_state)
         n_blob = int(2396130 * percent)
         n_features = 3231961
@@ -235,7 +238,7 @@ class URL(object):
 
 class Webspam(object):
     @staticmethod
-    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None):
+    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None, verbose=1):
         np.random.seed(random_state)
         n_blob = int(350000 * percent)
         n_features = 16609143
@@ -257,7 +260,7 @@ class Webspam(object):
 
 class RCV1Test(object):
     @staticmethod
-    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None):
+    def dist_read(rank, world_size, file, percent=0.1, split_by='features', random_state=42, datapoints=None, verbose=1):
         np.random.seed(random_state)
         n_blob = int(677399 * percent)
         n_features = 47236
@@ -299,7 +302,7 @@ def test(n_samples, n_features, rank, world_size, split_by='samples', random_sta
 
 
 def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split_by, dataset_path=None, random_state=42,
-                         transpose=True):
+                         transpose=True, verbose=1):
     r"""
     Assume the data_dir has following structure:
 
@@ -339,28 +342,46 @@ def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split
     # Check that the folder has expected strcuture
     if not (os.path.exists(X_file) and os.path.exists(y_file)):
         raise ValueError("dataset_path {} does not have expected file.".format(dataset_path))
-
+    
     X, y = joblib.load(X_file), joblib.load(y_file)
-    print("RANK {:3}: X, y has been loaded: {} {}".format(rank, X.shape, y.shape))
+    if verbose >= 3:
+        print("RANK {:3}: X, y has been loaded: {} {}".format(rank, X.shape, y.shape))
+    
+    X_file_test = os.path.join(dataset_path, 'X_test', str(rank))
+    y_file_test = os.path.join(dataset_path, 'y_test', str(rank))
+    issplit = True
+    if not (os.path.exists(X_file_test) and os.path.exists(y_file_test)):
+        issplit = False
+    X_test = y_test = None
+    if issplit:
+        X_test, y_test = joblib.load(X_file_test), joblib.load(y_file_test)
+        if verbose >= 3:
+            print("RANK {:3}: X_test, y_test has been loaded: {} {}".format(rank, X_test.shape, y_test.shape))
 
     if split_by == 'samples' and transpose:
         X = X.T
+        if issplit:
+            X_test = X_test.T
 
     if isinstance(X, np.ndarray) and not X.flags['F_CONTIGUOUS']:
         # The local coordinate solver (like scikit-learn's ElasticNet) requires X to be Fortran contiguous.
         # Since the time spent on converting the matrix can be very long, and CoCoA need to call solvers every round,
         # we perform such convertion before algorithm and disable check later.
         X = np.asfortranarray(X)
+        if issplit:
+            X_test = np.asfortranarray(X_test)
 
     if issparse(X):
         # For coordinate descent
         X = csc_matrix(X)
+        if issplit:
+            X_test = csc_matrix(X_test)
 
     # X, y, features_in_partition, n_samples, n_features
-    return X, y
+    return X, y, X_test, y_test
 
 
-def load_dataset(name, rank, world_size, dataset_size, datapoints, split_by, dataset_path=None, random_state=42):
+def load_dataset(name, rank, world_size, dataset_size, datapoints, split_by, dataset_path=None, random_state=42, verbose=1):
     """Load dataset in the distributed environment.
 
     Load matrix `X` and label `y` for this node in the network. The matrix `X` can be split by rows or columns
@@ -418,8 +439,8 @@ def load_dataset(name, rank, world_size, dataset_size, datapoints, split_by, dat
             rank, world_size, dataset_path, percent=percent, split_by=split_by, random_state=random_state, datapoints=datapoints)
     else:
         raise NotImplementedError
-
-    print(f'Rank {rank:3} features: {features_in_partition}')
+    if verbose >= 2:
+        print(f'Rank {rank:3} features: {features_in_partition}')
 
     # Transpose the matrix depending on the matrix split direction
     if split_by == 'samples':

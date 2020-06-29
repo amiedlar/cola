@@ -69,39 +69,39 @@ insert_dataset="mg_scale_insert1"
 control_dataset="mg_scale"
 permute_dataset="mg_scale_permute"
 
-rm -rf cache
-clean_dataset $replace_dataset true;
-echo -e $"\e[2m"
-colatools ${VERBOSE_FLAG} \
-    load $control_dataset \
-    replace-column 5 uniform \
-    split $replace_dataset
-    # replace-column --scale-col 0 --scale-by 1.1 5 scale \
-    #replace-column --scale-col 1 --scale-by .9  4 scale \
-    #replace-column --weights "0.5 0.5 0 0 0" 3 weights \
-echo -e $"\e[0m"
-clean_dataset $insert_dataset true;
-echo -e $"\e[2m"
-colatools ${VERBOSE_FLAG}\
-    load $control_dataset \
-    insert-column uniform \
-    split $insert_dataset
-    # insert-column --scale-col 0 --scale-by 1.1 scale \
-    #insert-column --scale-col 1 --scale-by 0.9 scale \
-    #insert-column --weights "1 2 3 4 5 6" weights \
-echo -e $"\e[0m"
+# rm -rf cache
+# clean_dataset $replace_dataset true;
+# echo -e $"\e[2m"
+# colatools ${VERBOSE_FLAG} \
+#     load $control_dataset \
+#     replace-column 5 uniform \
+#     split $replace_dataset
+#     # replace-column --scale-col 0 --scale-by 1.1 5 scale \
+#     #replace-column --scale-col 1 --scale-by .9  4 scale \
+#     #replace-column --weights "0.5 0.5 0 0 0" 3 weights \
+# echo -e $"\e[0m"
+# clean_dataset $insert_dataset true;
+# echo -e $"\e[2m"
+# colatools ${VERBOSE_FLAG}\
+#     load $control_dataset \
+#     insert-column uniform \
+#     split $insert_dataset
+#     # insert-column --scale-col 0 --scale-by 1.1 scale \
+#     #insert-column --scale-col 1 --scale-by 0.9 scale \
+#     #insert-column --weights "1 2 3 4 5 6" weights \
+# echo -e $"\e[0m"
 clean_dataset $control_dataset true;
 echo -e $"\e[2m"
 colatools ${VERBOSE_FLAG} \
     load $control_dataset \
-    split $control_dataset
+    split --train-percent 0.1 $control_dataset 
 echo -e $"\e[0m"
-clean_dataset $permute_dataset true;
-echo -e $"\e[2m"
-colatools ${VERBOSE_FLAG} \
-    load $control_dataset \
-    split --seed 42 $permute_dataset
-echo -e $"\e[0m\e[1mEND: Load Data\e[0m\n"
+# clean_dataset $permute_dataset true;
+# echo -e $"\e[2m"
+# colatools ${VERBOSE_FLAG} \
+#     load $control_dataset \
+#     split --seed 42 $permute_dataset
+# echo -e $"\e[0m\e[1mEND: Load Data\e[0m\n"
 ###################### END: Load Data ######################
 
 #################### START: Experiments ####################

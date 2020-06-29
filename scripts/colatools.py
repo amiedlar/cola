@@ -1,5 +1,6 @@
 from sklearn.datasets import load_svmlight_file, dump_svmlight_file
 from sklearn.preprocessing import normalize
+from sklearn.model_selection import train_test_split
 from scipy.sparse import csc_matrix
 import numpy as np
 import os
@@ -13,6 +14,18 @@ class RankEditor(object):
         self.outdir = os.path.abspath(outdir or 'data')
         self.data = None
         self.y = None
+
+    @property
+    def n_features(self):
+        if self.data is None:
+            return None 
+        return self.data.shape[1]
+    
+    @property
+    def n_points(self):
+        if self.data is None:
+            return None 
+        return self.data.shape[0]
         
 
 pass_editor = click.make_pass_decorator(RankEditor)
@@ -175,46 +188,71 @@ def save_svm(editor, filename, overwrite):
 @click.argument('dataset_name', type=click.STRING)
 @click.option('--K', type=click.INT, default=0, help="if provided, data is only split for K nodes (default: all possible splits)")
 @click.option('--seed', type=click.INT, default=None, help="random shuffling seed (default: no shuffle)")
+@click.option('--train', type=click.FLOAT, default=1)
 @pass_editor
-def split(editor, dataset_name, k, seed):
+def split(editor, dataset_name, k, seed, train):
+    if train > 1:
+        train = int(np.floor(train))
+        if train > editor.n_points:
+            train = editor.n_points
+    elif train >= 0:
+        train = int(np.ceil(train * editor.n_points))
+    else: 
+        raise ValueError('`train` must be a float in [0,1] or a positive integer')
     if k:
-        _split_dataset(editor, dataset_name, k, seed)
+        _split_dataset(editor, dataset_name, k, seed, train)
         return
     for k in range(1, editor.data.shape[1]+1):
-        _split_dataset(editor, dataset_name, k, seed)
+        _split_dataset(editor, dataset_name, k, seed, train)
 
-def _split_dataset(editor, dataset, K, seed):
+def _split_dataset(editor, dataset, K, seed, train):
     import joblib
-    _, n_features = editor.data.shape
     output_folder = os.path.join(editor.outdir, dataset, 'features', str(K))
     os.makedirs(os.path.join(output_folder, 'X'), exist_ok=True)
     os.makedirs(os.path.join(output_folder, 'y'), exist_ok=True)
+    X_test = y_test = None
 
-    indices = np.arange(n_features)
+    n_train = np.floor(train)
+    issplit = train < editor.n_points
+    print(f'Train/Test/Total: {train}/{editor.n_points-train}/{editor.n_points}')
+    if issplit:
+        os.makedirs(os.path.join(output_folder, 'X_test'), exist_ok=True)
+        os.makedirs(os.path.join(output_folder, 'y_test'), exist_ok=True)
+        X, X_test, y, y_test = train_test_split(editor.data, editor.y, 
+            random_state=seed, train_size=train)
+    else:
+        X, y = editor.data, editor.y
+    indices = np.arange(editor.n_features)
     if seed is not None:
         np.random.seed(seed)
         np.random.shuffle(indices)
         if editor.debug:
             print(f"randomized indices: {indices}")
-    block_size = int(n_features // K)
-    extra = int(n_features % K)
+    block_size = int(editor.n_features // K)
+    extra = int(editor.n_features % K)
 
     beg = 0
     for k in range(K):
         e = int(extra>0)
-        file_x = os.path.join(output_folder, 'X', str(k))
-        file_y = os.path.join(output_folder, 'y', str(k))
+        file_x_train = os.path.join(output_folder, 'X', str(k))
+        file_y_train = os.path.join(output_folder, 'y', str(k))
         if editor.debug:
             print(f"Node {k}: {indices[beg:beg+block_size+e]}")
-        joblib.dump(editor.data[:,indices[beg:beg+block_size+e]], file_x)
-        joblib.dump(editor.y, file_y)
+        joblib.dump(X[:,indices[beg:beg+block_size+e]], file_x_train)
+        joblib.dump(y, file_y_train)
+        if issplit:
+            file_x_test = os.path.join(output_folder, 'X_test', str(k))
+            file_y_test = os.path.join(output_folder, 'y_test', str(k))
+            joblib.dump(X_test[:,indices[beg:beg+block_size+e]], file_x_test)
+            joblib.dump(y_test, file_y_test)
         beg += block_size+e
         extra -= e
 
     joblib.dump(indices, os.path.join(output_folder, 'indices'))
     if editor.debug:
-        print(f"Splits for world_size {K} stored in '{output_folder}'")
-
+        print(f"Train splits for world_size {K} stored in '{output_folder}'")
+        if issplit:
+            print(f"Test splits for world_size {K} stored in '{output_folder}'")        
 
 if __name__ == "__main__":
     cli()

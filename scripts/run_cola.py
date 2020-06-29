@@ -11,8 +11,7 @@ from cola.monitor import Monitor
 
 import os
 
-# import pyximport
-# pyximport.install() 
+
 
 @click.command()
 @click.option('--dataset', type=click.STRING, help='The type of dataset.')
@@ -38,9 +37,10 @@ import os
 @click.option('--c', type=float, help='Constant in the LinearSVM.')
 @click.option('--ckpt_freq', type=int, default=10, help='')
 @click.option('--exit_time', default=1000.0, help='The maximum running time of a node.')
+@click.option('--verbose', default=1, type=click.IntRange(0, 3, clamp=True), help='Verbosity level, 0 is silent, 3 is full debug')
 def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, split_by, random_state,
          algoritmname, max_global_steps, local_iters, solvername, output_dir, exit_time, lambda_, l1_ratio, theta,
-         graph_topology, c, logmode, ckpt_freq, n_connectivity):
+         graph_topology, c, logmode, ckpt_freq, n_connectivity, verbose):
 
     # Fix gamma = 1.0 according to:
     #   Adding vs. Averaging in Distributed Primal-Dual Optimization
@@ -55,16 +55,16 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
 
     # Create graph with specified topology
     graph = define_graph_topology(
-        world_size, graph_topology, n_connectivity=n_connectivity)
+        world_size, graph_topology, n_connectivity=n_connectivity, verbose=verbose)
 
     if use_split_dataset:
         if not dataset_path:
             dataset_path = os.path.join('data', dataset, split_by, f'{world_size}')
-        X, y = load_dataset_by_rank(dataset, rank, world_size, dataset_size, datapoints, split_by,
-                                    dataset_path=dataset_path, random_state=random_state)
+        X, y, X_test, y_test = load_dataset_by_rank(dataset, rank, world_size, dataset_size, datapoints, split_by,
+                                    dataset_path=dataset_path, random_state=random_state, verbose=verbose)
     else:
         X, y = load_dataset(dataset, rank, world_size, dataset_size, datapoints, split_by,
-                            dataset_path=dataset_path, random_state=random_state)
+                            dataset_path=dataset_path, random_state=random_state, verbose=verbose)
 
     # Define subproblem
     solver = configure_solver(name=solvername, split_by=split_by, l1_ratio=l1_ratio,
@@ -75,14 +75,14 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
         output_dir = os.path.join(output_dir, algoritmname)
     if dataset:
         output_dir = os.path.join(output_dir, dataset, f'{world_size}/')
-    monitor = Monitor(solver, output_dir, ckpt_freq,
-                      exit_time, split_by, logmode, algoritmname)
+    monitor = Monitor(solver, output_dir, ckpt_freq, exit_time, split_by, logmode, algoritmname, verbose=verbose, Ak_test=X_test, y_test=y_test)
 
     # Always use this value throughout this project
     Akxk, xk = run_algorithm(algoritmname, X, y, solver, gamma, theta,
                              max_global_steps, local_iters, world_size,
                              graph, monitor)
-
+    if X_test is not None:
+        monitor.show_test_statistics(xk, y.shape[0])
     monitor.save(Akxk, xk, weightname='weight.npy', logname=f'result.csv')
 
 
