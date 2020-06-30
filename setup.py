@@ -31,13 +31,15 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'viewresults=scripts.viewresults:plot_results',
+            'view-results=scripts.viewresults:view_results',
             'colatools=scripts.colatools:cli',
             'run-cola=scripts.run_cola:main',
         ]
     },
     scripts=[
         'scripts/runRankExperiments.sh',
-        'scripts/runSingle.sh'
+        'scripts/runTopologyExperiments.sh',
+        'scripts/runFull.sh',
+        'scripts/runSingle.sh',
     ]
 )

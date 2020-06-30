@@ -76,14 +76,18 @@ class FigSpec:
         
         self.plots.append({'local': islocal, 'sidebyside': sidebyside, 'pos': pos, 'data': plots})
 
-    def draw(self):
+    def draw(self, override_height=None):
         self.fig.clf()
 
         self.fig.suptitle(self.name, fontsize=16) 
 
         n_plots = len(self.plots)
-        self.fig.set_size_inches(self.width, n_plots*self.width*.5)
-        gs = self.fig.add_gridspec(len(self.plots), 2)
+        if override_height is not None:
+            self.fig.set_size_inches(self.width, override_height*self.width*.5)
+            gs = self.fig.add_gridspec(override_height, 2)
+        else:
+            self.fig.set_size_inches(self.width, n_plots*self.width*.5)
+            gs = self.fig.add_gridspec(len(self.plots), 2)
         for (i, plot) in enumerate(self.plots):
             if plot['sidebyside']:
                 for (k, p) in enumerate(plot['data']):
@@ -126,13 +130,13 @@ def create_PlotSpec(yaxis, xaxis='i_iter', xlabel='Iteration Count'):
     if yaxis=='g_conj':
         return PlotSpec('g*', 'g_conj', r'$\log_{10}\|g^*(-w^TA)\|$', xaxis=xaxis, xlabel=xlabel)
     if yaxis=='rmse':
-        return PlotSpec('Root Mean Squared Error', yaxis, r'rmse', xaxis=xaxis, xlabel=xlabel, log_y=False)
+        return PlotSpec('Root Mean Squared Error', yaxis, r'$\log($rmse$)$', xaxis=xaxis, xlabel=xlabel)
     if yaxis=='r2':
-        return PlotSpec('$R^2$', yaxis, r'$R^2$', xaxis=xaxis, xlabel=xlabel, log_y=False)
+        return PlotSpec('$R^2$', yaxis, r'$\log(R^2)$', xaxis=xaxis, xlabel=xlabel)
     if yaxis=='max_rel':
-        return PlotSpec('Maximum Relative Error', yaxis, r'max relative error', xaxis=xaxis, xlabel=xlabel, log_y=False)
+        return PlotSpec('Maximum Relative Error', yaxis, r'$\log($max relative error$)$', xaxis=xaxis, xlabel=xlabel)
     if yaxis=='l2_rel':
-        return PlotSpec('Relative Error, 2-Norm', yaxis, r'$\|\|y^{pred}-y^{test}\|\|_2 / \|\|y^{test}\|\|_2$', xaxis=xaxis, xlabel=xlabel, log_y=False)
+        return PlotSpec('Relative Error, 2-Norm', yaxis, r'$\log \|\|y^{pred}-y^{test}\|\|_2 / \|\|y^{test}\|\|_2$', xaxis=xaxis, xlabel=xlabel)
 
 def plot_residual(k, res, comp_res=None):
     figspec = FigSpec(f'Residuals, {k} nodes')
@@ -232,7 +236,7 @@ def plot_update_and_global(local_, global_, global_y='gap', global_ylabel='Globa
 
 def plot_test_statistics(k, data, xaxis='i_iter', xlabel='global iteration step', comp_data=None):  
     n_train, n_test = np.max(data.loc[:,'n_train']), np.max(data.loc[:,'n_test'])
-    fspec = FigSpec(f'Prediction Test Statistics ({n_train}/{n_test}/{n_train+n_test}), {k} nodes', data=data, comp_data=data)
+    fspec = FigSpec(f'Prediction Test Statistics ({n_train}/{n_test}/{n_train+n_test}), {k} nodes', data=data, comp_data=None)
     rmse = create_PlotSpec('rmse', xaxis=xaxis, xlabel=xlabel)
     fspec.add_plot(rmse)
     r2 = create_PlotSpec('r2', xaxis=xaxis, xlabel=xlabel)
@@ -246,19 +250,25 @@ def plot_test_statistics(k, data, xaxis='i_iter', xlabel='global iteration step'
     fspec.draw()
     return fspec.fig
 
-@click.command()
+@click.group('view-results')
+def view_results():
+    pass
+
+@view_results.command('plot-results')
 @click.option('--k', type=click.INT, default=None, help='Number of mpi processes')
 @click.option('--logdir', type=click.STRING, default='log', help='root directory of output files')
 @click.option('--dataset', type=click.STRING, default='rderms', help='dataset name')
+@click.option('--topology', type=click.STRING, default='complete', help='graph topology')
 @click.option('--compare', is_flag=True)
+@click.option('--compdir', type=click.STRING, default='log/cocoa')
 @click.option('--save', is_flag=True)
-@click.option('--show/--no-show', default=True)
 @click.option('--savedir', type=click.STRING, default=None)
-def plot_results(k, logdir, dataset, compare, save, show, savedir):
+@click.option('--show/--no-show', default=True)
+def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, show):
     if save and savedir is None:
         savedir = 'out'
     log_path = os.path.join(logdir, dataset) 
-    comp_path = os.path.join(logdir, 'cocoa', dataset)
+    comp_path = os.path.join(compdir, dataset)
     if not os.path.exists(log_path):
         print(f"Log directory not found at '{log_path}'")
         exit(1)
@@ -277,8 +287,8 @@ def plot_results(k, logdir, dataset, compare, save, show, savedir):
                 print('No logs found in directory.')
                 exit(1)
     
-    log_path = os.path.join(log_path, f'{k}')
-    comp_path = os.path.join(comp_path, f'{k}')
+    log_path = os.path.join(log_path, f'{k}', topology)
+    comp_path = os.path.join(comp_path, f'{k}', topology)
     assert k is not None and k>0, 'logs not found, try specifying `logdir` and `k`' 
 
     weights_path = os.path.join(logdir, dataset, 'final_weight.npy')
@@ -313,7 +323,7 @@ def plot_results(k, logdir, dataset, compare, save, show, savedir):
         comp_path = None
     
     if savedir is not None:
-        savedir = os.path.join(savedir, dataset, f'{k}')
+        savedir = os.path.join(savedir, dataset, f'{k}', topology)
         os.makedirs(savedir, exist_ok=True)
     def saveorshow(fig, name):
         if save:
@@ -348,5 +358,52 @@ def plot_results(k, logdir, dataset, compare, save, show, savedir):
         fig = plot_residual(k, res, comp_res)
         saveorshow(fig, 'relative_error.png') 
 
+@view_results.command('topology')
+@click.option('--k', type=click.INT, default=16, help='Number of mpi processes')
+@click.option('--dataset', type=click.STRING, default='rderms', help='dataset name')
+@click.option('--logdir', type=click.STRING, default='log', help='root directory of output files')
+@click.option('--save', is_flag=True)
+@click.option('--savedir', type=click.STRING, default=None)
+@click.option('--show/--no-show', default=True)
+def topology(k, dataset, logdir, save, savedir, show):
+    if save and savedir is None:
+        savedir = 'out'
+    log_path = os.path.join(logdir, dataset, f'{k}')
+    
+    topologies = [f.path for f in os.scandir(log_path) if f.is_dir()]
+    if len(topologies) == 0:
+        print('no logs found')
+        return
+
+    results = [(os.path.basename(path), pd.read_csv(os.path.join(path, 'result.csv')).loc[1:]) 
+                for path in topologies]
+
+    if savedir is not None:
+        savedir = os.path.join(savedir, dataset, f'{k}', 'topology')
+        os.makedirs(savedir, exist_ok=True)
+    def saveorshow(fig, name):
+        if save:
+            fig.savefig(os.path.join(savedir, name), dpi=150)
+        if show:
+            plt.show()
+    
+    fspec = FigSpec('Topology - Test Statistics')
+    
+    n_train, n_test = np.max(results[0][1].loc[:,'n_train']), np.max(results[0][1].loc[:,'n_test'])
+    fspec = FigSpec(f'Prediction Test Statistics ({n_train}/{n_test}/{n_train+n_test}), {k} nodes')
+    rmse = create_PlotSpec('rmse')
+    r2 = create_PlotSpec('r2')
+    l2_rel = create_PlotSpec('l2_rel')
+    max_rel = create_PlotSpec('max_rel')
+    for (topo, data) in results:
+        fspec.add_plot(rmse, data=data, label=topo, pos=np.s_[0,:])
+        fspec.add_plot(r2, data=data, label=topo, pos=np.s_[1,:])
+        fspec.add_plot(l2_rel, data=data, label=topo, pos=np.s_[2,:])
+        fspec.add_plot(max_rel, data=data, label=topo, pos=np.s_[3,:])
+    fspec.draw(override_height=4)
+    saveorshow(fspec.fig, f'topology_test-stats_{n_train}-{n_test}-{n_train+n_test}_{k}-nodes.png')
+    
+
+
 if __name__ == '__main__':
-    plot_results()
+    view_results()
