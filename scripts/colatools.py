@@ -14,6 +14,7 @@ class RankEditor(object):
         self.outdir = os.path.abspath(outdir or 'data')
         self.data = None
         self.y = None
+        self.index = None
 
     @property
     def n_features(self):
@@ -58,6 +59,7 @@ def load(editor, dataset, confirm):
     old_y = editor.y.copy() if editor.y is not None else None
     try:
         editor.data, editor.y = load_svmlight_file(path)
+        editor.index = np.asarray(range(len(editor.y)))
         editor.data = editor.data.tocsc()
         if editor.debug:
             print(f"Loaded '{dataset}', shape {editor.data.shape}")
@@ -66,7 +68,7 @@ def load(editor, dataset, confirm):
         print(e)
         editor.data = old_data
         editor.y = old_y
-        return
+        exit(0)
 
 @cli.command('replace-column')
 @click.argument('col', type=click.INT)
@@ -184,6 +186,18 @@ def save_svm(editor, filename, overwrite):
         print(f"Data with shape {editor.data.shape} saved to '{path}'")
     return
 
+@cli.command('info-rank')
+@pass_editor
+def info_rank(editor):
+    rank = np.linalg.matrix_rank(editor.data.todense())
+    print(f"rank(A) = {rank}")
+
+@cli.command('info-cond')
+@pass_editor
+def info_cond(editor):
+    cond = np.linalg.cond(editor.data.todense())
+    print(f"cond(A) = {cond}")
+
 @cli.command('split')
 @click.argument('dataset_name', type=click.STRING)
 @click.option('--K', type=click.INT, default=0, help="if provided, data is only split for K nodes (default: all possible splits)")
@@ -218,10 +232,11 @@ def _split_dataset(editor, dataset, K, seed, train):
     if issplit:
         os.makedirs(os.path.join(output_folder, 'X_test'), exist_ok=True)
         os.makedirs(os.path.join(output_folder, 'y_test'), exist_ok=True)
-        X, X_test, y, y_test = train_test_split(editor.data, editor.y, 
-            random_state=seed, train_size=train)
+        X, X_test, y, y_test, index, index_test = train_test_split(editor.data, editor.y, editor.index,
+            shuffle=seed is not None, random_state=seed, train_size=train)
     else:
         X, y = editor.data, editor.y
+        index = editor.index
     indices = np.arange(editor.n_features)
     if seed is not None:
         np.random.seed(seed)
@@ -247,7 +262,8 @@ def _split_dataset(editor, dataset, K, seed, train):
             joblib.dump(y_test, file_y_test)
         beg += block_size+e
         extra -= e
-
+    index.dump(os.path.join(output_folder, 'index.npy'))
+    index_test.dump(os.path.join(output_folder, 'index_test.npy'))
     joblib.dump(indices, os.path.join(output_folder, 'indices'))
     if editor.debug:
         print(f"Train splits for world_size {K} stored in '{output_folder}'")

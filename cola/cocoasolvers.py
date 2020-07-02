@@ -205,7 +205,7 @@ class ElasticNet(CoCoASubproblemSolver):
         if self.l1_ratio < 1.0:
             # Conjugate of ElasticNet (0 <= l1_ratio < 1)
             def conjugate(x):
-                return np.sum(np.clip(np.abs(x) - self.l1_ratio, 0, np.inf) ** 2 / 2 / (1 - self.l1_ratio))
+                return np.sum(np.clip(np.abs(x) - self.l1_ratio, 0, np.inf) ** 2) / (2*(1-self.l1_ratio))
         else:
             # Lasso
             def conjugate(x):
@@ -222,7 +222,7 @@ class ElasticNet(CoCoASubproblemSolver):
         super(ElasticNet, self).dist_init(Ak, y, theta, local_iters, sigma)
 
         # This constant is used to compute conjugate of modified L1 norm
-        self.B = self.f(np.zeros(len(self.y))) / self.lambda_ if self.lambda_ > 0 else self.f(np.zeros(len(self.y)))
+        self.B = self.f(np.zeros(len(self.y))) / self.lambda_
 
     def load_approximate_solver(self, sigma, local_iters, theta):
         """Load approximate solver to solve the standized problem."""

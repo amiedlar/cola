@@ -1,19 +1,60 @@
 export JOBLIB_CACHE_DIR='./cache'
 
+pause() {
+    read -n 1 -p "Press any key to continue..." > /dev/null  
+}
+
+pad() {
+    echo $1 | awk '{printf "%02d\n", $0;}'
+}
+
 set_cola_parameters() {
     declare -g LOG_DIR=${LOG_DIR:-'./log'}
     declare -g OUT_DIR=${OUT_DIR:-'./out'}
 
     DATASET=${DATASET:-'rderms2'}
-    MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-16}
-
+    declare -g MAX_WORLD_SIZE
+    declare -g TRAIN_SIZE
+    declare -g L1_RATIO
+    declare -g LAMBDA
+    declare -g LINREG_ITER
+    if [[ $DATASET == 'rderms2'* ]]; then
+        MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-16}
+        TRAIN_SIZE=${TRAIN_SIZE:-16}
+        L1_RATIO=${L1_RATIO:-0.8}
+        LAMBDA=${LAMBDA:-1}
+        LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
+    elif [[ $DATASET == 'rderms16'* ]]; then
+        MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-16}
+        TRAIN_SIZE=${TRAIN_SIZE:-16}
+        L1_RATIO=${L1_RATIO:-0.8}
+        LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
+        LAMBDA=${LAMBDA:-1e-4}
+    elif [[ $DATASET == 'rderms' ]]; then
+        MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-5}
+        TRAIN_SIZE=${TRAIN_SIZE:-16}
+        L1_RATIO=${L1_RATIO:-0.2}
+        LAMBDA=${LAMBDA:-1e1}
+        LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
+    elif [[ $DATASET == 'mg'* ]]; then 
+        MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-6}
+        TRAIN_SIZE=${TRAIN_SIZE:-0.7}
+        LAMBDA=${LAMBDA:-1e-4}
+        L1_RATIO=${L1_RATIO:-0.5}
+    elif [[ $DATASET == 'housing'* ]]; then 
+        MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-13}
+        TRAIN_SIZE=${TRAIN_SIZE:-0.6}
+        LAMBDA=${LAMBDA:-1e-7}
+        L1_RATIO=${L1_RATIO:-0.5}
+    fi
     echo -e $"|-> Parameters"
 
-    declare -g GLOBAL_STEPS=${GLOBAL_STEPS:-1000}
+    declare -g RANDOM_STATE=${RANDOM_STATE:-42}
+    echo -e $"|---> random_state="$RANDOM_STATE
+
+    declare -g GLOBAL_STEPS=${GLOBAL_STEPS:-200}
     echo -e $"|---> global_steps="$GLOBAL_STEPS
-    declare -g L1_RATIO=${L1_RATIO:-0.5}
     echo -e $"|---> l1_ratio="$L1_RATIO
-    declare -g LAMBDA=${LAMBDA:-1e-4}
     echo -e $"|---> lambda="$LAMBDA
     declare -g THETA=${THETA:-1e-7}
     echo -e $"|---> theta="$THETA
@@ -32,10 +73,11 @@ set_cola_parameters() {
         OVERSUB_FLAG=''
     fi
     declare -g VERBOSE=${V:-1}
-    if [ $VERBOSE > 1 ]; then
+    if [[ $VERBOSE -gt 1 ]]; then
         VERBOSE_FLAG='-v';
     else
         VERBOSE_FLAG=''
+        export PYTHONWARNINGS="ignore"
     fi
 }
 
@@ -72,11 +114,11 @@ run_cola_n() {
 run_cola() {
     local DATASET=$1
     K_l=$2
-    LOG_PATH_l="$LOG_DIR/$DATASET/$K_l/$TOPOLOGY"
+    LOG_PATH_l="$LOG_DIR/$DATASET/"$(pad $K_l)"/$TOPOLOGY"
     # Run cola
     echo -e $"|-> Running CoLA, world size=$WORLD_SIZE, oversubscribe=${OVERSUB_FLAG}"
     echo -e $"|---> Logging to '$LOG_PATH_l'"
-    mpirun -n $K_l --output-filename "$LOG_PATH_l/mpilog" ${OVERSUB_FLAG} run-cola \
+    mpirun -n $K_l --output-filename $LOG_PATH_l'/mpilog' ${OVERSUB_FLAG} run-cola \
         --split_by 'features' \
         --max_global_steps $GLOBAL_STEPS \
         --graph_topology $TOPOLOGY \
@@ -93,8 +135,9 @@ run_cola() {
         --solvername $LOCAL_ALG \
         --algoritmname $GLOBAL_ALG \
         --use_split_dataset \
+        --random_state $RANDOM_STATE \
         --verbose $VERBOSE 
     # Save result plot
     echo -e $"|---> Saving result plots to '$OUT_DIR/$DATASET/$K_l/$TOPOLOGY/'"
-    view-results plot-results --dataset $DATASET --topology $TOPOLOGY --k $K_l --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save > /dev/null;
+    view-results plot-results --dataset $DATASET $LINREG_ITER --topology $TOPOLOGY --k $K_l --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save;
 }

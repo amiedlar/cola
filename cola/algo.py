@@ -17,9 +17,9 @@ def run_algorithm(algorithm, Ak, b, solver, gamma, theta, max_global_steps, loca
         if algorithm == 'cola':
             Akxk, xk = cola(Ak, b, solver, gamma, theta,
                             max_global_steps, local_iters, n_nodes, graph, monitor)
-        elif algorithm == 'cocoa':
-            Akxk, xk = cocoa(Ak, b, solver, gamma, theta,
-                            max_global_steps, local_iters, n_nodes, monitor)
+        # elif algorithm == 'cocoa':
+        #     Akxk, xk = cocoa(Ak, b, solver, gamma, theta,
+        #                     max_global_steps, local_iters, n_nodes, monitor)
         else:
             raise NotImplementedError()
     return Akxk, xk

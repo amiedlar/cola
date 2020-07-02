@@ -32,8 +32,8 @@ import os
 @click.option('--dataset_path', default=None, help='Path to dataset')
 @click.option('--graph_topology', type=str, help='Graph topology of the network.')
 @click.option('--n_connectivity', type=int, help='Connected Cycle.')
-@click.option('--l1_ratio', type=float, help='l1 ratio in the ElasticNet')
-@click.option('--lambda_', type=float, help='Size of regularizer')
+@click.option('--l1_ratio', type=float, default=1,help='l1 ratio in the ElasticNet')
+@click.option('--lambda_', type=float, default=1e-5,help='Size of regularizer')
 @click.option('--c', type=float, help='Constant in the LinearSVM.')
 @click.option('--ckpt_freq', type=int, default=10, help='')
 @click.option('--exit_time', default=1000.0, help='The maximum running time of a node.')
@@ -74,7 +74,7 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
     if algoritmname != 'cola':
         output_dir = os.path.join(output_dir, algoritmname)
     if dataset:
-        output_dir = os.path.join(output_dir, dataset, f'{world_size}', graph_topology)
+        output_dir = os.path.join(output_dir, dataset, f'{world_size:0>2}', graph_topology)
     monitor = Monitor(solver, output_dir, ckpt_freq, exit_time, split_by, logmode, algoritmname, verbose=verbose, Ak_test=X_test, y_test=y_test)
 
     # Always use this value throughout this project
