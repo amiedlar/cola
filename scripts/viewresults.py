@@ -125,16 +125,22 @@ def create_PlotSpec(yaxis, xaxis='i_iter', xlabel='Iteration Count', **kwargs):
         return PlotSpec('Residuals', yaxis, r'$\|\|x_k - x^*\|\|/\|\|x^*\|\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
     if yaxis=='local_gap':
         return PlotSpec('Gap', yaxis, r'local gap', xaxis=xaxis, xlabel=xlabel, **kwargs)
+    if yaxis=='cert_gap':
+        return PlotSpec('Gap', yaxis, r'$ v_k^\top\nabla f(v_k) + \sum_{i\in\mathcal{P}_k} (g_i(v_k) + g_i^* (-A_i^\top \nabla f(v_k)))$', xaxis=xaxis, xlabel=xlabel, **kwargs)
     if yaxis=='cv2':
         return PlotSpec('Consensus Violation', yaxis, r'$\|\| A_kx_k - v_k \|\|^2/ \|\|v_k\|\|^2$', xaxis=xaxis, xlabel=xlabel, **kwargs)
+    if yaxis=='cert_cv':
+        return PlotSpec('Consensus Violation', yaxis, r'$\|\| \nabla f(v_k) - \frac{1}{\|\mathcal{N}_k \|} \sum_{j\in\mathcal{N}_k}\nabla f(v_j) \|\|_2$', xaxis=xaxis, xlabel=xlabel, **kwargs)
     if yaxis=='delta_xk':
         return PlotSpec('Change in Local Iterates', yaxis, r'$\|\| \Delta x_k \|\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
     if yaxis=='P':
-        return PlotSpec('Primal', yaxis, r'$\|\mathcal{P}(w)\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
+        return PlotSpec('Primal', yaxis, r'$\|\mathcal{P}(x)\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
     if yaxis=='D':
-        return PlotSpec('Dual', yaxis, r'$\|\mathcal{D}(x)\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
+        return PlotSpec('Dual', yaxis, r'$\|\mathcal{D}(w)\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
     if yaxis=='gap':
-        return PlotSpec('Gap', yaxis, r'$\|\mathcal{P}(w) + \mathcal{D}(x)\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
+        return PlotSpec('Gap', yaxis, r'$\|\mathcal{P}(x) + \mathcal{D}(w)\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
+    if yaxis=='gap_rel':
+        return PlotSpec('Relative Gap', yaxis, r'$\|\mathcal{P}(x) + \mathcal{D}(w)\|/\|\mathcal{D}(w)\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
     if yaxis=='f':
         return PlotSpec('f', yaxis, r'$\|f(Ax)\|$', xaxis=xaxis, xlabel=xlabel, **kwargs)
     if yaxis=='g':
@@ -182,6 +188,18 @@ def plot_local_results(k, local, xaxis='i_iter', xlabel='global iteration step',
     figspec.draw(large=large)
     return figspec.fig
 
+def plot_local_cert(k, local, xaxis='i_iter', xlabel='global iteration step', comp_data=None, large=False):
+    figspec = FigSpec(f'Local Certificates, {k} nodes', data=local, comp_data=comp_data)
+
+    gap = create_PlotSpec('cert_gap', xaxis=xaxis, xlabel=xlabel, log_y=True)
+    figspec.add_plot(gap, islocal=True)
+
+    cv2 = create_PlotSpec('cert_cv', xaxis=xaxis, xlabel=xlabel, log_y=True)
+    figspec.add_plot(cv2, islocal=True)
+    
+    figspec.draw(large=large)
+    return figspec.fig
+
 def plot_duality_gap(k, data, xaxis='i_iter', xlabel='global iteration step', comp_data=None, large=False):
     # Plot primal and dual
     fspec = FigSpec(f'Global Results, {k} nodes', data=data, comp_data=comp_data)
@@ -194,6 +212,9 @@ def plot_duality_gap(k, data, xaxis='i_iter', xlabel='global iteration step', co
 
     gap = create_PlotSpec('gap', xaxis=xaxis, xlabel=xlabel)
     fspec.add_plot(gap)
+
+    gap_rel = create_PlotSpec('gap_rel', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(gap_rel)
 
     fspec.draw(large=large)
     return fspec.fig
@@ -252,6 +273,19 @@ def plot_update_and_global(local_, global_, global_y='gap', global_ylabel='Globa
     fspec.draw(large=large)
     return fspec.fig
 
+def plot_cert_and_global(local_, global_, global_y='gap', global_ylabel='Global Gap', xaxis='i_iter', xlabel='global iteration step', large=False):
+    fspec = FigSpec(f'Local Certificates and Global Gap , {len(local_)} nodes')
+    gap = PlotSpec('', 'gap', '', xaxis=xaxis, xlabel=xlabel)
+    cert_gap = PlotSpec('Local and Global Gaps', 'cert_gap_scaled', '', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(gap, data=global_, label=r'$\log_{10} \|global\ gap\|$', pos=np.s_[0:2,:])
+    fspec.add_plot(cert_gap, data=local_, label=r'$\log_{10} \|cert\ gap\|$', islocal=True, pos=np.s_[0:2,:])
+    
+    cert_cv = PlotSpec('Local CV and Global Gap', 'cert_cv_scaled', '', xaxis=xaxis, xlabel=xlabel)
+    fspec.add_plot(gap, data=global_, label=r'$\log_{10} \|global\ gap\|$', pos=np.s_[2:4,:])
+    fspec.add_plot(cert_cv, data=local_, label=r'$\log_{10} \|cert\ cv\|$', islocal=True, pos=np.s_[2:4,:])
+    fspec.draw(large=large)
+    return fspec.fig
+
 def plot_test_statistics(k, data, xaxis='i_iter', xlabel='global iteration step', comp_data=None, large=False):  
     n_train, n_test = np.max(data.loc[:,'n_train']), np.max(data.loc[:,'n_test'])
     fspec = FigSpec(f'Prediction Test Statistics ({n_train}/{n_test}/{n_train+n_test}), {k} nodes', data=data, comp_data=None)
@@ -272,14 +306,15 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False):
     data_dir = os.path.join('data', dataset, 'features', str(k))
     index = np.asarray(np.load(os.path.join(data_dir, 'index.npy'), allow_pickle=True), dtype=np.int)
     index_test = np.asarray(np.load(os.path.join(data_dir, 'index_test.npy'), allow_pickle=True), dtype=np.int)
-    
+    col_perm = np.asarray(np.load(os.path.join(data_dir, 'col_index.npy'), allow_pickle=True), dtype=np.int)
     from sklearn.datasets import load_svmlight_file
     X, y = load_svmlight_file(os.path.join('..', 'data', dataset+'.svm'))
     if check_iter is None:
         weights = np.load(os.path.join(logdir, f'weight.npy'), allow_pickle=True)
     else:
         weights = np.load(os.path.join(logdir, f'weight_epoch_{check_iter}.npy'), allow_pickle=True)
-    regression = X*weights
+    print(weights)
+    regression = X[:,col_perm]*weights
     t = np.linspace(0, len(y)//4, len(y))
 
     c_train = (0.95294118, 0.56078431, 0.14901961)
@@ -302,7 +337,7 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False):
     # plt.tick_params(which='major', labelsize='large')
     train = plt.scatter(t[index], y[index], c=c_train, s=49, label=f'Train PCC Voltage ({len(index)})')
     test = plt.scatter(t[index_test], y[index_test], c=c_test, s=49, label=f'Test PCC Voltage ({len(index_test)})')
-    plt.plot(t, regression, color=c_reg, label=f"Predicted PCC Voltage, Iter {check_iter or 'Max.'}", linewidth=4)
+    plt.plot(t, regression, color=c_reg, label=f"Predicted PCC Voltage", linewidth=4)
 
     plt.legend(loc='best', fontsize='x-large')
     
@@ -323,7 +358,7 @@ def view_results():
 @click.option('--save', is_flag=True)
 @click.option('--savedir', type=click.STRING, default=None)
 @click.option('--show/--no-show', default=True)
-@click.option('--large/--no-large', default=True)
+@click.option('--large/--no-large')
 @click.option('--linreg-iter', default=None, type=click.INT)
 def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, show, large, linreg_iter):
     if save and savedir is None:
@@ -402,6 +437,9 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
     fig = plot_local_results(k, local_results, comp_data=comp_local, large=large)
     saveorshow(fig, 'local.png')
 
+    fig = plot_local_cert(k, local_results, comp_data=comp_local, large=large)
+    saveorshow(fig, 'local-cert.png')
+
     fig = plot_minimizers(k, global_results, comp_data=comp_global, large=large)
     saveorshow(fig, 'minimizers.png')
 
@@ -416,6 +454,9 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
 
     fig = plot_update_and_global(local_results, global_results, large=large)
     saveorshow(fig, 'update-and-gap.png')
+
+    fig = plot_cert_and_global(local_results, global_results, large=large)
+    saveorshow(fig, 'cert-and-gap.png')
 
     if 'n_test' in global_results:
         fig = plot_test_statistics(k, global_results, comp_data=comp_global, large=large)
@@ -505,17 +546,20 @@ def _topology_all_rank(dataset, logdir, saveorshow, large=False):
     for topo in topologies:
         t_results = None
         for (worldsize, f) in topologies[topo]:
-            df = pd.read_csv(os.path.join(f, 'result.csv')).iloc[-1]
+            df = pd.read_csv(os.path.join(f, 'result.csv'))
+            max_iter = np.max(df['i_iter'])
+            df = df.loc[max_iter,:]
+            print(f"iter: {df['i_iter']}")
             df = df.append(pd.Series([int(worldsize)], index=['worldsize']))
             if keys is None:
                 keys = df.index
-            print(f"added data for worldsize {int(worldsize)}, topology '{topo}'")
+            print(f"added data for worldsize {int(worldsize)}, topology '{os.path.basename(f)}'")
             t_data = np.reshape(np.asarray(df), (1, len(keys)))
             if t_results is None:
                 t_results = t_data
             else:
                 t_results = np.concatenate([t_results, t_data])
-        results[topo]=(np.asarray(t_results))
+        results[topo] = np.asarray(t_results)
     
     for (topo, data) in results.items():
         results[topo] = pd.DataFrame(data, columns=keys)
@@ -530,6 +574,7 @@ def _topology_all_rank(dataset, logdir, saveorshow, large=False):
     l2_rel = create_PlotSpec('l2_rel', log_y=False, xaxis='worldsize', xlabel='# MPI Nodes')
     max_rel = create_PlotSpec('max_rel', log_y=False, xaxis='worldsize', xlabel='# MPI Nodes')
     for (topo, data) in results.items():
+        print(f"{topo}: RMSE={data['rmse']}")
         fspec.add_plot(rmse, data=data, label=topo, pos=np.s_[0,:])
         fspec.add_plot(r2, data=data, label=topo, pos=np.s_[1,:])
         fspec.add_plot(l2_rel, data=data, label=topo, pos=np.s_[2,:])

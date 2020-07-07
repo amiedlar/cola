@@ -20,26 +20,26 @@ set_cola_parameters() {
     declare -g LINREG_ITER
     if [[ $DATASET == 'rderms2'* ]]; then
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-16}
-        TRAIN_SIZE=${TRAIN_SIZE:-16}
-        L1_RATIO=${L1_RATIO:-0.8}
-        LAMBDA=${LAMBDA:-1}
-        LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
+        TRAIN_SIZE=${TRAIN_SIZE:-24}
+        L1_RATIO=${L1_RATIO:-.7}
+        LAMBDA=${LAMBDA:-1e-3}
+        # LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
     elif [[ $DATASET == 'rderms16'* ]]; then
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-16}
         TRAIN_SIZE=${TRAIN_SIZE:-16}
-        L1_RATIO=${L1_RATIO:-0.8}
-        LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
+        L1_RATIO=${L1_RATIO:-0}
+        # LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
         LAMBDA=${LAMBDA:-1e-4}
     elif [[ $DATASET == 'rderms' ]]; then
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-5}
-        TRAIN_SIZE=${TRAIN_SIZE:-16}
-        L1_RATIO=${L1_RATIO:-0.2}
-        LAMBDA=${LAMBDA:-1e1}
-        LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
+        TRAIN_SIZE=${TRAIN_SIZE:-24}
+        L1_RATIO=${L1_RATIO:-.2}
+        LAMBDA=${LAMBDA:-1e-3}
+        # LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
     elif [[ $DATASET == 'mg'* ]]; then 
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-6}
         TRAIN_SIZE=${TRAIN_SIZE:-0.7}
-        LAMBDA=${LAMBDA:-1e-4}
+        LAMBDA=${LAMBDA:-5e-4}
         L1_RATIO=${L1_RATIO:-0.5}
     elif [[ $DATASET == 'housing'* ]]; then 
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-13}
@@ -130,7 +130,7 @@ run_cola() {
         --output_dir $LOG_DIR \
         --dataset_size 'all' \
         --ckpt_freq 1 \
-        --local_iters 10 \
+        --local_iters 25 \
         --dataset $DATASET \
         --solvername $LOCAL_ALG \
         --algoritmname $GLOBAL_ALG \
@@ -138,6 +138,6 @@ run_cola() {
         --random_state $RANDOM_STATE \
         --verbose $VERBOSE 
     # Save result plot
-    echo -e $"|---> Saving result plots to '$OUT_DIR/$DATASET/$K_l/$TOPOLOGY/'"
-    view-results plot-results --dataset $DATASET $LINREG_ITER --topology $TOPOLOGY --k $K_l --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save;
+    echo -e $"|---> Saving result plots to '$OUT_DIR/$DATASET/$K_l/$TOPOLOGY/', linreg_iter=$LINREG_ITER"
+    view-results plot-results --dataset $DATASET $LINREG_ITER --topology $TOPOLOGY --k $K_l --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save --large;
 }

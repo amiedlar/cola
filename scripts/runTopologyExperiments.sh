@@ -4,13 +4,27 @@ set_cola_parameters
 TRAIN_SIZE=${TRAIN_SIZE:-0.7}
 #################### START: Experiments ####################
 echo -e $"\e[1mSTART: Experiments\e[0m"
-clean_dataset $DATASET true;
 echo -e $"\e[2m"
+if [[ $SCALE = true ]]; then
+clean_dataset $DATASET'_scale' true;
+colatools ${VERBOSE_FLAG} \
+    load $DATASET \
+    scale \
+    info-rank \
+    info-cond --p 'fro' \
+    info-cond --p 1 \
+    info-cond --p 2 \
+    dump-svm --overwrite $DATASET'_scale' \
+    split --train $TRAIN_SIZE --seed $RANDOM_STATE $DATASET'_scale'
+DATASET=$DATASET'_scale'
+else
+clean_dataset $DATASET true;
 colatools ${VERBOSE_FLAG} \
     load $DATASET \
     info-rank \
     info-cond \
-    split --train $TRAIN_SIZE --seed $RANDOM_STATE $DATASET 
+    split --train $TRAIN_SIZE --seed $RANDOM_STATE $DATASET
+fi
 echo -e $"\e[0m"
 ###################### START: Complete #####################
 echo -e $"\e[1mSTART: Complete\e[0m"
@@ -47,9 +61,9 @@ echo -e $"\e[1mEND: Grid\e[0m\n"
 
 for (( K=1; K<=$MAX_WORLD_SIZE; K++ ))
 do
-    view-results topology --k $K --dataset $DATASET --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save  --large
+    view-results topology --k $K --dataset $DATASET --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save 
 done
-view-results topology --dataset $DATASET --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save --large
+view-results topology --dataset $DATASET --logdir $LOG_DIR --savedir $OUT_DIR --no-show --save
 
 # Clear cache
 clean_dataset $DATASET

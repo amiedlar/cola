@@ -70,6 +70,19 @@ def load(editor, dataset, confirm):
         editor.y = old_y
         exit(0)
 
+@cli.command('scale')
+@click.option('--center', is_flag=True)
+@click.option('--scale-var/--no-scale-var', is_flag=True, default=True)
+@pass_editor
+def scale(editor, center, scale_var):
+    # from sklearn.preprocessing import scale
+    # editor.data = csc_matrix(scale(editor.data.todense(), with_mean=center, with_std=scale_var))
+    editor.data = editor.data.todense()
+    for i in range(editor.data.shape[1]):
+        editor.data[:,i] /= np.linalg.norm(editor.data[:,i], np.inf)
+        # print(f'||X_{i}||_2 = {np.linalg.norm(editor.data[:,i], 2)}')
+    editor.data = csc_matrix(editor.data)
+
 @cli.command('replace-column')
 @click.argument('col', type=click.INT)
 @click.argument('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
@@ -167,12 +180,14 @@ def _insert_column(editor, scheme, scale, scale_by, weights):
         print("Inserted new column as "+debug_str)
     return
 
-@cli.command('save-svm')
+@cli.command('dump-svm')
 @click.argument('filename', type=click.STRING)
 @click.option('--overwrite', is_flag=True)
 @pass_editor
-def save_svm(editor, filename, overwrite):
+def dump_svm(editor, filename, overwrite):
     assert editor.data is not None, "no data is loaded"
+    if not '.svm' in filename:
+        filename += '.svm'
     path = os.path.join(editor.indir, filename)
     if os.path.exists(path) and not overwrite:
         print(f"Error: '{path}' already exists, use `--overwrite` to save anyway")
@@ -193,10 +208,18 @@ def info_rank(editor):
     print(f"rank(A) = {rank}")
 
 @cli.command('info-cond')
+@click.option('--p', type=click.STRING, help="Norm for use for condition number, either int or 'fro'")
 @pass_editor
-def info_cond(editor):
-    cond = np.linalg.cond(editor.data.todense())
-    print(f"cond(A) = {cond}")
+def info_cond(editor, p):
+    try:
+        new_p = int(p)
+        p = new_p
+    except:
+        pass
+    A_pinv = np.linalg.pinv(editor.data.todense())
+    norm = np.linalg.norm(editor.data.todense(), p)
+    norm_pinv = np.linalg.norm(A_pinv, p)
+    print(f"cond(A, p={p}) = {norm*norm_pinv}")
 
 @cli.command('split')
 @click.argument('dataset_name', type=click.STRING)
@@ -238,11 +261,11 @@ def _split_dataset(editor, dataset, K, seed, train):
         X, y = editor.data, editor.y
         index = editor.index
     indices = np.arange(editor.n_features)
-    if seed is not None:
-        np.random.seed(seed)
-        np.random.shuffle(indices)
-        if editor.debug:
-            print(f"randomized indices: {indices}")
+    # if seed is not None:
+    #     np.random.seed(seed)
+    #     np.random.shuffle(indices)
+    #     if editor.debug:
+    #         print(f"randomized indices: {indices}")
     block_size = int(editor.n_features // K)
     extra = int(editor.n_features % K)
 
@@ -264,7 +287,7 @@ def _split_dataset(editor, dataset, K, seed, train):
         extra -= e
     index.dump(os.path.join(output_folder, 'index.npy'))
     index_test.dump(os.path.join(output_folder, 'index_test.npy'))
-    joblib.dump(indices, os.path.join(output_folder, 'indices'))
+    indices.dump(os.path.join(output_folder, 'col_index.npy'))
     if editor.debug:
         print(f"Train splits for world_size {K} stored in '{output_folder}'")
         if issplit:

@@ -17,7 +17,7 @@ class Monitor(object):
     * save weight file and log files if specified;
     """
 
-    def __init__(self, solver, output_dir, ckpt_freq, exit_time=None, split_by='samples', mode='local', alg='cola', Ak_test=None, y_test=None, verbose=1):
+    def __init__(self, solver, output_dir, ckpt_freq, graph, exit_time=None, split_by='samples', mode='local', alg='cola', Ak=None, Ak_test=None, y_test=None, verbose=1):
         """
         Parameters
         ----------
@@ -36,12 +36,14 @@ class Monitor(object):
              * `global` mode logs duality gap of the whole program. It takes more time to compute.
         """
         assert isinstance(solver, CoCoASubproblemSolver)
+        self.Ak = Ak
         self.Ak_test = Ak_test
         self.y_test = y_test
         self.do_prediction_tests = self.Ak_test is not None and self.y_test is not None
 
         self.rank = comm.get_rank()
         self.world_size = comm.get_world_size()
+        self.graph = graph
 
         self.alg = alg
 
@@ -65,6 +67,8 @@ class Monitor(object):
         # in a local node. As a result, we will defer the division to the logging time.
         self.split_by_samples = split_by == 'samples'
 
+        self._sigma_sum = None
+
     # def _all_reduce_scalar(self, scalar, op):
     #     tensor = torch.DoubleTensor([scalar])
     #     comm.all_reduce(tensor, op=op)
@@ -75,19 +79,33 @@ class Monitor(object):
     #     comm.all_reduce(t, op=op)
     #     return t
 
-    def log(self, vk, Akxk, xk, i_iter, solver, delta_xk=None):
+    def update_sigma_sum(self):
+        sigma = np.linalg.norm(self.Ak.todense()) ** 2
+        n = self.Ak.shape[1]
+        partial = n**2 * sigma
+        self._sigma_sum = comm.all_reduce(partial, 'SUM')
+
+    @property
+    def sigma_sum(self):
+        if self._sigma_sum is None:
+            self.update_sigma_sum()
+
+        return self._sigma_sum
+            
+
+    def log(self, vk, Akxk, xk, i_iter, solver, delta_xk=None, cert_cv=0.0):
         # Skip the time for logging
         self.running_time += time.time() - self.previous_time
 
         if self.mode == 'local':
-            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk)
+            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk, cert_cv=cert_cv)
         elif self.mode == 'global':
             self._log_global(vk, Akxk, xk, i_iter, solver)
         elif self.mode == None:
             pass
         elif self.mode == 'all':
             self.records = self.records_l
-            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk)
+            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk, cert_cv=cert_cv)
             self.records_l = self.records
             self.records = self.records_g
             self._log_global(vk, Akxk, xk, i_iter, solver)
@@ -107,7 +125,7 @@ class Monitor(object):
             gap = self.records_g[-1]['gap']
         return max_running_time > self.exit_time or abs(gap) < 1e-15
 
-    def _log_local(self, vk, Akxk, xk, i_iter, solver, delta_xk=None):
+    def _log_local(self, vk, Akxk, xk, i_iter, solver, delta_xk=None, cert_cv=0.0):
         record = {}
         record['i_iter'] = i_iter
         record['time'] = self.running_time
@@ -117,15 +135,17 @@ class Monitor(object):
         except:
             record['local_gap'] = 0
             record['n_iter_'] = 0
-        K = comm.get_world_size()
-        wk = self.solver.grad_f(Akxk)
+
         record['delta_xk'] = norm(delta_xk) if delta_xk is not None else np.nan
-        record['mag_xk'] = norm(xk, 2)
-        record['mag_vk'] = norm(vk, 2)
-        record['mag_Akxk'] = norm(Akxk, 2)
-        record['cert_gap'] = Akxk @ wk
-        L = 1/self.solver.theta
-        record['cert_cv'] = norm(wk - self.solver.grad_f(vk), 2) 
+
+        record['cert_gap'] = (vk @ solver.grad_f(vk) + solver.gk(xk) + solver.gk_conj(solver.grad_f(vk)))
+        record['cert_cv'] = cert_cv
+
+        gap_rhs = 1 / (2 * comm.get_world_size())
+        cv_rhs = np.sqrt(self.sigma_sum) * (1 - self.graph.beta) * np.sqrt(solver.theta) / (2 * np.sqrt(comm.get_world_size()))
+
+        record['cert_gap_scaled'] = record['cert_gap'] / gap_rhs
+        record['cert_cv_scaled'] = record['cert_cv'] / cv_rhs
 
         self.records.append(record)
 
@@ -143,21 +163,18 @@ class Monitor(object):
             v = comm.all_reduce(np.array(Akxk), op='SUM')
         w = self.solver.grad_f(v)
 
-        record['res'] = float(norm(v - self.solver.y)/norm(self.solver.y))
-        val_res2 = (-w @ self.solver.Ak) @ xk
-        record['res2'] = float(comm.all_reduce(val_res2, 'SUM'))
-        record['wy'] = float(w @ self.solver.y)
+        record['res'] = norm(v - self.solver.y) / norm(self.solver.y)
+
         # Compute squared norm of consensus violation
-        record['cv2'] = float(norm(vk - v, 2) ** 2)
+        record['cv2'] = norm(vk - v, 2) ** 2
         if self.mode == 'all':
             self.records_l[-1]['cv2'] = record['cv2']
+
         # Compute the value of minimizer objective
-        record['mag_xk'] = norm(xk,2)
-        record['mag_v'] = float(norm(v,2) ** 2)
         val_gk = self.solver.gk(xk)
         record['g'] = comm.all_reduce(val_gk, 'SUM')
         record['f'] = self.solver.f(v)
-        record['f*'] = 0.5*float(norm(v,2)**2 - norm(self.solver.y,2)**2) 
+
         # Compute the value of conjugate objective
         val_gk_conj = self.solver.gk_conj(w)
         record['f_conj'] = self.solver.f_conj(w)
@@ -172,14 +189,18 @@ class Monitor(object):
         record['g_conj'] /= n_samples
         record['f'] /= n_samples
         record['f_conj'] /= n_samples
-        record['wy'] /= n_samples
-        record['f*'] /= n_samples
-        # The dual should be monotonically decreasing
-        record['D'] = record['f'] + record['g']
-        record['P'] = record['f_conj'] + record['g_conj']
 
-        # Duality gap of the gloabl problem
-        record['gap'] = record['D'] + record['P']
+        # The primal should be monotonically decreasing
+        record['P'] = record['f'] + record['g']
+        record['D'] = record['f_conj'] + record['g_conj']
+
+        # Duality gap of the global problem
+        record['gap'] = (record['D'] + record['P'])
+        if record['D'] > 0:
+            record['gap_rel'] = record['gap'] / record['D']
+        elif record['P'] > 0:
+            record['gap_rel'] = record['gap'] / record['P']
+
 
         if self.do_prediction_tests:
             y_predict = self.Ak_test*xk
@@ -195,8 +216,6 @@ class Monitor(object):
         self.records.append(record)
 
         if self.rank == 0:
-            if self.verbose >= 3:
-                print('Iter {i_iter:5} DEBUG: res={res2:10.3e}, w*y={wy:10.3e}, f*={f*:10.3e}'.format(**record)) 
             if self.verbose >= 2:
                 print("Iter {i_iter:5}, Time {time:10.5e}: gap={gap:10.3e}, P={P:10.3e}, D={D:10.3e}, f={f:10.3e}, "
                   "g={g:10.3e}, f_conj={f_conj:10.3e}, g_conj={g_conj:10.3e}".format(**record))
