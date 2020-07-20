@@ -36,7 +36,7 @@ if [[ $REDUCED = true ]]; then
     fi
 else
     if [[ $SCALE = true ]]; then
-    NEW_DATASET=$DATASET'_rsvd_scale'
+    NEW_DATASET=$DATASET'_svd_scale'
     clean_dataset $NEW_DATASET true;
     colatools ${VERBOSE_FLAG} \
         load $DATASET \
@@ -49,7 +49,7 @@ else
         split --train $TRAIN_SIZE --seed $RANDOM_STATE $NEW_DATASET
     DATASET=$NEW_DATASET
     else
-    NEW_DATASET=$DATASET'_rsvd'
+    NEW_DATASET=$DATASET'_svd'
     clean_dataset $NEW_DATASET true;
     colatools ${VERBOSE_FLAG} \
         load $DATASET \
