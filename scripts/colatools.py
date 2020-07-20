@@ -9,7 +9,7 @@ import click
 
 
 class MatrixEditor(object):
-    def __init__(self, indir=None, outdir=None, debug=False):
+    def __init__(self, indir=None, outdir=None, seed=None, debug=False):
         self.debug = debug
         self.indir = os.path.abspath(indir or '../data')
         self.outdir = os.path.abspath(outdir or 'data')
@@ -18,6 +18,7 @@ class MatrixEditor(object):
         self.index = None
         self.s = None
         self.Vh = None
+        self.seed = seed
 
     @property
     def n_features(self):
@@ -38,12 +39,13 @@ pass_editor = click.make_pass_decorator(MatrixEditor)
 @click.option('--basepath', default='.')
 @click.option('--indir', default=os.path.join('..', 'data'))
 @click.option('--outdir', default='data')
+@click.option('--seed', type=click.INT, default=None)
 @click.option('-v', is_flag=True)
 @click.pass_context
-def cli(ctx, basepath, indir, outdir, v):
+def cli(ctx, basepath, indir, outdir, seed, v):
     indir = os.path.join(basepath, indir)
     outdir = os.path.join(basepath, outdir)
-    ctx.obj = MatrixEditor(indir, outdir, v) 
+    ctx.obj = MatrixEditor(indir, outdir, seed, v) 
 
 @cli.command('load')
 @click.argument('dataset')
@@ -197,7 +199,10 @@ def remove_column(editor, col):
 @pass_editor
 def decompose(editor, method, threshold, scale, k):
     if method == 'svd':
-        U, s, editor.Vh = _rsvd(editor, threshold, k)
+        # U, s, editor.Vh = _rsvd(editor, threshold, k)
+        from randlinalg.svd import rsvd
+        k = k or editor.data.shape[1]
+        U, s, editor.Vh = rsvd(editor.data.todense(), k, threshold=threshold, random_state=editor.seed)
         print(f'Singular Values: {s}')
         if scale:
             editor.s = s

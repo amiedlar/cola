@@ -27,7 +27,8 @@ setup(
     ext_modules=cythonize(ext_modules, compiler_directives={'language_level': 3}),
     packages=[
         'cola',
-        'fast_cd'
+        'fast_cd',
+        'randlinalg'
     ],
     entry_points={
         'console_scripts': [

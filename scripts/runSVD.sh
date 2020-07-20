@@ -8,13 +8,13 @@ GLOBAL_STEPS=200
 echo -e $"\e[1mSTART: Experiments\e[0m"
 echo -e $"\e[2m"
 if [[ $REDUCED = true ]]; then
-    MAX_WORLD_SIZE=4
+    MAX_WORLD_SIZE=3
     if [[ $SCALE = true ]]; then
     NEW_DATASET=$DATASET'_rsvd_scale'
     clean_dataset $NEW_DATASET true;
     colatools ${VERBOSE_FLAG} \
         load $DATASET \
-        decompose --scale --threshold 1e-1 svd \
+        decompose --scale --threshold 1e0 svd \
         info-rank \
         info-cond --p 'fro' \
         info-cond --p 1 \
@@ -27,7 +27,7 @@ if [[ $REDUCED = true ]]; then
     clean_dataset $NEW_DATASET true;
     colatools ${VERBOSE_FLAG} \
         load $DATASET \
-        decompose --threshold 1e-1 svd \
+        decompose --threshold 1e0 svd \
         info-rank \
         info-cond \
         dump-svm --overwrite $NEW_DATASET \
