@@ -74,11 +74,9 @@ def cola(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, graph, 
             avg_grad_f += localsolver.grad_f(local_vs[node_id])
         avg_grad_f /= len(local_lookups)
         cert_cv = np.linalg.norm(localsolver.grad_f(averaged_v) - avg_grad_f, 2)
-        if i_iter<3:
-            print(f"[{rank}] iter {i_iter}: Certificate CV={cert_cv}")
 
         if monitor.log(averaged_v, Akxk, xk, i_iter, localsolver, delta_x, cert_cv=cert_cv):
-            if monitor.verbose >= 1:
+            if monitor.verbose >= 1 and rank == 0:
                 print(f'break @ iter {i_iter}.')
             break
 

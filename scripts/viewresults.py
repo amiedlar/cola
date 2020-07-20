@@ -1,5 +1,7 @@
+from aurum.gld import GLD
 import click
 import csv
+from datetime import datetime
 from math import ceil
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -8,6 +10,35 @@ import numpy as np
 import pandas as pd
 import os
 import logging
+
+def getPlayerData(modelPath, outputPath='output', overwrite=False):
+    # check if output exists
+    if os.path.exists(os.path.join(outputPath, 'master.glm')) and not overwrite:
+        print('|-> GLD model files already generated, continuing')
+        # load post-run data
+        gld = GLD(os.path.join(outputPath, 'master.glm'))
+    else:    
+        # load model
+        gld = GLD(os.path.join(modelPath, 'master.glm'))
+        clock = gld.get_all('clock')[0]
+        clock.set_start_time(datetime(2001, 5, 1))
+        clock.set_stop_time(datetime(2001, 5, 2))
+        for player in gld.get_all('player'):
+            player.player_profile.set_start_time(datetime(2001, 5, 1))
+        
+        # remove all default recorders and add recorders for specified buses
+        for recorder in gld.get_all('recorder'):
+            gld.remove(recorder)
+        for group_recorder in gld.get_all('group_recorder'):
+            gld.remove(group_recorder)
+        for collector in gld.get_all('collector'):
+            gld.remove(collector)
+
+        # run model
+        gld.run(prefix=outputPath, overwrite=overwrite)
+    
+    # get player profiles
+    return { player.values['name'] : player.player_profile.dataframe.iloc[::15] for player in gld.get_all('player') }
 
 class PlotSpec:
     def __init__(self, title, yaxis, ylabel, log_y=True, xaxis='i_iter', xlabel='Iteration Count'):
@@ -302,21 +333,37 @@ def plot_test_statistics(k, data, xaxis='i_iter', xlabel='global iteration step'
     fspec.draw(large=large)
     return fspec.fig
 
-def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False):
+def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, scaleweights=False, gldmodel_dir='../gridlab-d_models/models/riverside-allPV'):
     data_dir = os.path.join('data', dataset, 'features', str(k))
     index = np.asarray(np.load(os.path.join(data_dir, 'index.npy'), allow_pickle=True), dtype=np.int)
     index_test = np.asarray(np.load(os.path.join(data_dir, 'index_test.npy'), allow_pickle=True), dtype=np.int)
     col_perm = np.asarray(np.load(os.path.join(data_dir, 'col_index.npy'), allow_pickle=True), dtype=np.int)
     from sklearn.datasets import load_svmlight_file
-    X, y = load_svmlight_file(os.path.join('..', 'data', dataset+'.svm'))
     if check_iter is None:
         weights = np.load(os.path.join(logdir, f'weight.npy'), allow_pickle=True)
     else:
         weights = np.load(os.path.join(logdir, f'weight_epoch_{check_iter}.npy'), allow_pickle=True)
+    weights = weights.reshape(len(weights))
+    if scaleweights:
+        i=0
+        orig = dataset
+        while '_rank' in orig:
+            orig = orig.replace(f'_rank{i}', '')
+            i += 1
+        orig = orig.replace('_svd', '').replace('_scale', '').replace('_rsvd', '')
+        X, y = load_svmlight_file(os.path.join('..', 'data', orig+'.svm'))
+        Vh, s = load_svmlight_file(os.path.join('..', 'data', dataset+'-w'+'.svm'))
+        weights = ((1/s[col_perm]) * weights).reshape(len(weights))
+        weights = Vh.transpose()[:,col_perm] * weights
+    else:
+        X, y = load_svmlight_file(os.path.join('..', 'data', dataset+'.svm'))
     print(weights)
-    regression = X[:,col_perm]*weights
+    regression = X*weights
     t = np.linspace(0, len(y)//4, len(y))
 
+    # load profiles
+    profile_data = getPlayerData(gldmodel_dir, overwrite=True)
+    print(profile_data)
     c_train = (0.95294118, 0.56078431, 0.14901961)
     c_test = (0.39215686, 0.77254902, 0.93333333)
     c_reg = (0.29411765, 0.32941176, 0.36470588)
@@ -326,7 +373,15 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False):
         plt.rc('xtick', labelsize='large')
         # plt.rc('ylabel', )
         plt.rc('ytick', labelsize='large')
-    fig = plt.figure('Linear regression')
+        ptSize = 49
+        lineWidth = 4
+    else:
+        ptSize = 16
+        lineWidth = 1
+    if scaleweights:
+        fig = plt.figure('Linear Regression, Original')
+    else:
+        fig = plt.figure('Linear regression')
     if large:
         fig.set_size_inches(16,10)
         
@@ -335,9 +390,12 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False):
     plt.xlabel('Time (h)', fontsize='xx-large')#, fontsize=24)
     plt.ylabel('Voltage (V)', fontsize='xx-large')#, fontsize=24)
     # plt.tick_params(which='major', labelsize='large')
-    train = plt.scatter(t[index], y[index], c=c_train, s=49, label=f'Train PCC Voltage ({len(index)})')
-    test = plt.scatter(t[index_test], y[index_test], c=c_test, s=49, label=f'Test PCC Voltage ({len(index_test)})')
-    plt.plot(t, regression, color=c_reg, label=f"Predicted PCC Voltage", linewidth=4)
+    plt.scatter(t[index], y[index], c=c_train, s=ptSize, label=f'Train PCC Voltage ({len(index)})')
+    plt.scatter(t[index_test], y[index_test], c=c_test, s=ptSize, label=f'Test PCC Voltage ({len(index_test)})')
+    plt.plot(t, regression, color=c_reg, label=f"Predicted PCC Voltage", linewidth=lineWidth)
+    for (name, data) in profile_data:
+        plt.plot(t, data['load'], label=name, linewidth=lineWidth)
+        plt.plot(t, data['load'], label=name, linewidth=lineWidth)
 
     plt.legend(loc='best', fontsize='x-large')
     
@@ -359,8 +417,9 @@ def view_results():
 @click.option('--savedir', type=click.STRING, default=None)
 @click.option('--show/--no-show', default=True)
 @click.option('--large/--no-large')
+@click.option('--svd', is_flag=True)
 @click.option('--linreg-iter', default=None, type=click.INT)
-def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, show, large, linreg_iter):
+def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, show, large, svd, linreg_iter):
     if save and savedir is None:
         savedir = 'out'
     log_path = os.path.join(logdir, dataset) 
@@ -464,6 +523,9 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
 
         fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
         saveorshow(fig, 'linear_regression.png')
+        if svd:
+            fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter, scaleweights=True)
+            saveorshow(fig, 'linear_regression_svd.png')
 
     if showres:
         fig = plot_update_and_global(local_results, res, global_y='res', global_ylabel=r'$\log_{10} (\|\|x_k - x^*\|\|/\|\|x^*\|\|)$')

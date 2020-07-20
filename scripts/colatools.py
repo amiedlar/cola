@@ -2,12 +2,13 @@ from sklearn.datasets import load_svmlight_file, dump_svmlight_file
 from sklearn.preprocessing import normalize
 from sklearn.model_selection import train_test_split
 from scipy.sparse import csc_matrix
+from scipy.sparse.linalg import svds
 import numpy as np
 import os
 import click
 
 
-class RankEditor(object):
+class MatrixEditor(object):
     def __init__(self, indir=None, outdir=None, debug=False):
         self.debug = debug
         self.indir = os.path.abspath(indir or '../data')
@@ -15,6 +16,8 @@ class RankEditor(object):
         self.data = None
         self.y = None
         self.index = None
+        self.s = None
+        self.Vh = None
 
     @property
     def n_features(self):
@@ -29,7 +32,7 @@ class RankEditor(object):
         return self.data.shape[0]
         
 
-pass_editor = click.make_pass_decorator(RankEditor)
+pass_editor = click.make_pass_decorator(MatrixEditor)
 
 @click.group(chain=True)
 @click.option('--basepath', default='.')
@@ -40,7 +43,7 @@ pass_editor = click.make_pass_decorator(RankEditor)
 def cli(ctx, basepath, indir, outdir, v):
     indir = os.path.join(basepath, indir)
     outdir = os.path.join(basepath, outdir)
-    ctx.obj = RankEditor(indir, outdir, v) 
+    ctx.obj = MatrixEditor(indir, outdir, v) 
 
 @cli.command('load')
 @click.argument('dataset')
@@ -180,12 +183,57 @@ def _insert_column(editor, scheme, scale, scale_by, weights):
         print("Inserted new column as "+debug_str)
     return
 
+@cli.command('remove-column')
+@click.argument('col', type=click.INT)
+@pass_editor
+def remove_column(editor, col):
+    editor.data = csc_matrix(np.delete(editor.data.todense(), col, 1))
+
+@cli.command('decompose')
+@click.argument('method', type=click.Choice(['svd']))
+@click.option('--threshold', type=click.FLOAT, default=0.0)
+@click.option('--scale', is_flag=True)
+@click.option('--k', type=click.INT, default=None)
+@pass_editor
+def decompose(editor, method, threshold, scale, k):
+    if method == 'svd':
+        U, s, editor.Vh = _rsvd(editor, threshold, k)
+        print(f'Singular Values: {s}')
+        if scale:
+            editor.s = s
+            editor.data = csc_matrix(U)
+        else:
+            S = np.diag(s)
+            editor.s = np.ones_like(s)
+            editor.data = csc_matrix(U * S)
+
+def _rsvd(editor, threshold=0.0, k=None):
+    U, s, Vh = np.linalg.svd(editor.data.todense(), False, compute_uv=True)
+    if k:
+        indices = np.s_[0:k]
+    else:
+        indices = s > threshold
+    U = U[:,indices]
+    s = s[indices]
+    Vh = Vh[indices, :]
+    return U, s, Vh
+
+@cli.command('low-rank-approx')
+@click.argument('rank', type=click.INT)
+@pass_editor
+def low_rank_approx(editor, rank):
+    U, s, Vh = _rsvd(editor, k=rank)
+    editor.data = csc_matrix(U @ np.diag(s) @ Vh)
+
 @cli.command('dump-svm')
 @click.argument('filename', type=click.STRING)
 @click.option('--overwrite', is_flag=True)
 @pass_editor
 def dump_svm(editor, filename, overwrite):
     assert editor.data is not None, "no data is loaded"
+    if editor.Vh is not None:
+        filenamew = filename.replace('.svm', '') + '-w.svm'
+        pathw = os.path.join(editor.indir, filenamew)
     if not '.svm' in filename:
         filename += '.svm'
     path = os.path.join(editor.indir, filename)
@@ -196,7 +244,11 @@ def dump_svm(editor, filename, overwrite):
         if editor.debug:
             print(f"Warning: '{path}' already exists, overwriting")
         os.remove(path)
+        if editor.Vh is not None and os.path.exists(pathw):
+            os.remove(pathw)
     dump_svmlight_file(editor.data, editor.y, path)
+    if editor.Vh is not None:
+        dump_svmlight_file(editor.Vh, editor.s, pathw)
     if editor.debug:
         print(f"Data with shape {editor.data.shape} saved to '{path}'")
     return

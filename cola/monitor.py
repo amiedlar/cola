@@ -123,7 +123,7 @@ class Monitor(object):
         gap = 100
         if self.mode == 'all':
             gap = self.records_g[-1]['gap']
-        return max_running_time > self.exit_time or abs(gap) < 1e-15
+        return max_running_time > self.exit_time or abs(gap) < 1e-6
 
     def _log_local(self, vk, Akxk, xk, i_iter, solver, delta_xk=None, cert_cv=0.0):
         record = {}
@@ -142,7 +142,7 @@ class Monitor(object):
         record['cert_cv'] = cert_cv
 
         gap_rhs = 1 / (2 * comm.get_world_size())
-        cv_rhs = np.sqrt(self.sigma_sum) * (1 - self.graph.beta) * np.sqrt(solver.theta) / (2 * np.sqrt(comm.get_world_size()))
+        cv_rhs = (1 - self.graph.beta) / (2 * np.sqrt(comm.get_world_size()) * np.sqrt(self.sigma_sum))
 
         record['cert_gap_scaled'] = record['cert_gap'] / gap_rhs
         record['cert_cv_scaled'] = record['cert_cv'] / cv_rhs
@@ -261,6 +261,7 @@ class Monitor(object):
                     print("Weight has been save to {} on node 0".format(weightfile))
 
     def show_test_statistics(self, xk_final, n_train, Ak_test=None, y_test=None):
+        comm.barrier()
         if Ak_test is None:
             Ak_test = self.Ak_test
         if y_test is None:
