@@ -38,7 +38,10 @@ def getPlayerData(modelPath, outputPath='output', overwrite=False):
         gld.run(prefix=outputPath, overwrite=overwrite)
     
     # get player profiles
-    return { player.values['name'] : player.player_profile.dataframe.iloc[::15] for player in gld.get_all('player') }
+    profile_data = { player.values['name'] : player.player_profile.dataframe.iloc[::15] for player in gld.get_all('player') }
+    # for name in profile_data:
+    #     profile_data[name]['load'] = np.abs((profile_data[name]['load'] * 8359.1 + 43.67552) + (profile_data[name]['load'] * 2153.74 + 11.2531)*1j)
+    return profile_data
 
 class PlotSpec:
     def __init__(self, title, yaxis, ylabel, log_y=True, xaxis='i_iter', xlabel='Iteration Count'):
@@ -333,7 +336,7 @@ def plot_test_statistics(k, data, xaxis='i_iter', xlabel='global iteration step'
     fspec.draw(large=large)
     return fspec.fig
 
-def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, scaleweights=False, gldmodel_dir='../gridlab-d_models/models/riverside-allPV'):
+def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, scaleweights=False):
     data_dir = os.path.join('data', dataset, 'features', str(k))
     index = np.asarray(np.load(os.path.join(data_dir, 'index.npy'), allow_pickle=True), dtype=np.int)
     index_test = np.asarray(np.load(os.path.join(data_dir, 'index_test.npy'), allow_pickle=True), dtype=np.int)
@@ -361,9 +364,6 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, sca
     regression = X*weights
     t = np.linspace(0, len(y)//4, len(y))
 
-    # load profiles
-    profile_data = getPlayerData(gldmodel_dir, overwrite=True)
-    print(profile_data)
     c_train = (0.95294118, 0.56078431, 0.14901961)
     c_test = (0.39215686, 0.77254902, 0.93333333)
     c_reg = (0.29411765, 0.32941176, 0.36470588)
@@ -393,9 +393,74 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, sca
     plt.scatter(t[index], y[index], c=c_train, s=ptSize, label=f'Train PCC Voltage ({len(index)})')
     plt.scatter(t[index_test], y[index_test], c=c_test, s=ptSize, label=f'Test PCC Voltage ({len(index_test)})')
     plt.plot(t, regression, color=c_reg, label=f"Predicted PCC Voltage", linewidth=lineWidth)
-    for (name, data) in profile_data:
-        plt.plot(t, data['load'], label=name, linewidth=lineWidth)
-        plt.plot(t, data['load'], label=name, linewidth=lineWidth)
+
+    plt.legend(loc='best', fontsize='x-large')
+    
+    fig.tight_layout()
+    return fig
+
+def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=False, low_rank_cols=False, gldmodel_dir='../gridlab-d_models/models/riverside-allPV'):
+    data_dir = os.path.join('data', dataset, 'features', str(k))
+    index = np.asarray(np.load(os.path.join(data_dir, 'index.npy'), allow_pickle=True), dtype=np.int)
+    index_test = np.asarray(np.load(os.path.join(data_dir, 'index_test.npy'), allow_pickle=True), dtype=np.int)
+    from sklearn.datasets import load_svmlight_file
+    if check_iter is None:
+        weights = np.load(os.path.join(logdir, f'weight.npy'), allow_pickle=True)
+    else:
+        weights = np.load(os.path.join(logdir, f'weight_epoch_{check_iter}.npy'), allow_pickle=True)
+    weights = weights.reshape(len(weights))
+
+    X, y = load_svmlight_file(os.path.join('..', 'data', dataset+'.svm'))
+    regression = X*weights
+    t = np.linspace(0, len(y)//4, len(y))
+
+    # load profiles
+    profile_data = getPlayerData(gldmodel_dir)
+    c_train = (0.95294118, 0.56078431, 0.14901961)
+    c_test = (0.39215686, 0.77254902, 0.93333333)
+    c_reg = (0.29411765, 0.32941176, 0.36470588)
+    if large:
+        plt.rc('font', size=24, weight=300)
+        # plt.rc('xlabel', )
+        plt.rc('xtick', labelsize='large')
+        # plt.rc('ylabel', )
+        plt.rc('ytick', labelsize='large')
+        ptSize = 49
+        lineWidth = 4
+    else:
+        ptSize = 16
+        lineWidth = 1
+    fig = plt.figure('Profiles and Regression')
+    if large:
+        fig.set_size_inches(16,10)
+    else:
+        fig.set_size_inches(12, 6)
+        
+    
+    # plt.title(f'Linear Regression after 1 Iteration for 5 {os.path.basename(logdir).capitalize()} Connected Inverters')
+    plt.xlabel('Time (h)', fontsize='xx-large')#, fontsize=24)
+    plt.ylabel('Voltage (V)', fontsize='xx-large')#, fontsize=24)
+    # plt.tick_params(which='major', labelsize='large')
+    def normalize(data, ref=None):
+        if ref is None:
+            ref = data
+        avg = np.average(ref)
+        min_ = np.min(ref)
+        max_ = np.max(ref)
+        return (data - avg)/(max_ - min_)
+    
+    U, s, Vh = np.linalg.svd(X.todense())
+    if low_rank_cols:
+        X_1 = s[0] * U[:, 0] @ Vh[0, :]
+        plt.plot(t, normalize(X_1[:,0]), label=f'Rank 1 Approx')
+        X_2 = X_1 + s[1] * U[:, 1] @ Vh[1, :]
+        plt.plot(t, normalize(X_2[:,0]), label=f'Rank 2 Approx')
+    else:
+        plt.plot(t, normalize(U[:,0]*s[0]), label=f'Left Singular Vector {1}')
+        plt.plot(t, normalize(U[:,1]*s[1]), label=f'Left Singular Vector {2}')
+    plt.plot(t, normalize(regression), color=c_reg, label=f"Predicted PCC Voltage", linewidth=lineWidth)
+    for (name, data) in profile_data.items():
+        plt.plot(t, normalize(data['load']), label=name, linewidth=lineWidth)
 
     plt.legend(loc='best', fontsize='x-large')
     
@@ -493,29 +558,29 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
             plt.show()
 
     # Plotting
-    fig = plot_local_results(k, local_results, comp_data=comp_local, large=large)
-    saveorshow(fig, 'local.png')
+    # fig = plot_local_results(k, local_results, comp_data=comp_local, large=large)
+    # saveorshow(fig, 'local.png')
 
-    fig = plot_local_cert(k, local_results, comp_data=comp_local, large=large)
-    saveorshow(fig, 'local-cert.png')
+    # fig = plot_local_cert(k, local_results, comp_data=comp_local, large=large)
+    # saveorshow(fig, 'local-cert.png')
 
-    fig = plot_minimizers(k, global_results, comp_data=comp_global, large=large)
-    saveorshow(fig, 'minimizers.png')
+    # fig = plot_minimizers(k, global_results, comp_data=comp_global, large=large)
+    # saveorshow(fig, 'minimizers.png')
 
-    fig = plot_minimizers_end(k, global_results, comp_data=comp_global, large=large)
-    saveorshow(fig, 'minimizers-last-half.png')
+    # fig = plot_minimizers_end(k, global_results, comp_data=comp_global, large=large)
+    # saveorshow(fig, 'minimizers-last-half.png')
 
-    fig = plot_minimizers_exact(k, global_results, comp_data=comp_global, large=large)
-    saveorshow(fig, 'minimizers-exact.png')
+    # fig = plot_minimizers_exact(k, global_results, comp_data=comp_global, large=large)
+    # saveorshow(fig, 'minimizers-exact.png')
 
-    fig = plot_duality_gap(k, global_results, comp_data=comp_global, large=large)
-    saveorshow(fig, 'duality-gap.png')
+    # fig = plot_duality_gap(k, global_results, comp_data=comp_global, large=large)
+    # saveorshow(fig, 'duality-gap.png')
 
-    fig = plot_update_and_global(local_results, global_results, large=large)
-    saveorshow(fig, 'update-and-gap.png')
+    # fig = plot_update_and_global(local_results, global_results, large=large)
+    # saveorshow(fig, 'update-and-gap.png')
 
-    fig = plot_cert_and_global(local_results, global_results, large=large)
-    saveorshow(fig, 'cert-and-gap.png')
+    # fig = plot_cert_and_global(local_results, global_results, large=large)
+    # saveorshow(fig, 'cert-and-gap.png')
 
     if 'n_test' in global_results:
         fig = plot_test_statistics(k, global_results, comp_data=comp_global, large=large)
@@ -523,6 +588,9 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
 
         fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
         saveorshow(fig, 'linear_regression.png')
+
+        fig = plot_profiles_and_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
+        saveorshow(fig, 'profiles_and_regression.png')
         if svd:
             fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter, scaleweights=True)
             saveorshow(fig, 'linear_regression_svd.png')
