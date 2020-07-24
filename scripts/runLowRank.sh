@@ -7,7 +7,7 @@ OUT_DIR=out/lowrank
 MAXRANK=${MAXRANK:-MAX_WORLD_SIZE}
 #################### START: Experiments ####################
 echo -e $"\e[1mSTART: Experiments\e[0m"
-for (( RANK=1; RANK<=$MAXRANK; RANK++ ))
+for (( RANK=$MAXRANK; RANK<=$MAXRANK; RANK++ ))
 do
     NEW_DATASET=$DATASET'_rank'$RANK
     echo -e $"\e[2m"

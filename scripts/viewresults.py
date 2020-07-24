@@ -11,7 +11,9 @@ import pandas as pd
 import os
 import logging
 
-def getPlayerData(modelPath, outputPath='output', overwrite=False):
+
+
+def getPlayerData(modelPath, outputPath='output', overwrite=False, return_gld=False):
     # check if output exists
     if os.path.exists(os.path.join(outputPath, 'master.glm')) and not overwrite:
         print('|-> GLD model files already generated, continuing')
@@ -41,8 +43,72 @@ def getPlayerData(modelPath, outputPath='output', overwrite=False):
     profile_data = { player.values['name'] : player.player_profile.dataframe.iloc[::15] for player in gld.get_all('player') }
     # for name in profile_data:
     #     profile_data[name]['load'] = np.abs((profile_data[name]['load'] * 8359.1 + 43.67552) + (profile_data[name]['load'] * 2153.74 + 11.2531)*1j)
+    if return_gld:
+        return profile_data, gld
     return profile_data
 
+def getTotalLoad(modelPath, nLoads, type='all', remove_mean=True):
+    import sys 
+    sys.path.append('./scripts')
+    from utility import selectDownstreamInverters, getPCC
+    if type not in ['res', 'com', 'all']:
+        raise RuntimeError(f"type {type} not recognized: must be one of ['res', 'com', 'all']")
+    player_data, gld = getPlayerData(modelPath, return_gld=True)
+    pcc = getPCC(gld)
+    inverters = selectDownstreamInverters(gld, pcc, nLoads, 'A')
+    loads = [
+        load for load in gld.get_all('load') 
+            if load.values['parent'] in [inv.values['parent'] for inv in inverters]
+    ]
+    print("\ninverters:")
+    for i in inverters:
+        print(i.values)
+    print("\nloads:")
+    for l in loads:
+        print(l.values)
+    # scaledLoads = np.zeros((player_data['LprofileCom'].shape[0],1))
+    scaledLoads = None
+    for load in loads:
+        loadName = 'constant_power_A_real'
+        if (loadName not in load.values):
+            continue
+        if ('LprofileCom' in load.values[loadName]):
+            if type == 'res':
+                continue
+            expression = load.values[loadName].replace('LprofileCom.value*','')
+            load_data = player_data['LprofileCom']['load']
+        else:
+            if type == 'com':
+                continue
+            expression = load.values[loadName].replace('LprofileRes.value*','')
+            load_data = player_data['LprofileRes']['load']
+        if ('+' in expression):
+            words = expression.split('+')
+            a = float(words[0])
+            b = float(words[1])
+        else:
+            words = expression.split('-')
+            a  = float(words[0])
+            b = -float(words[1])
+        if scaledLoads is None:
+            scaledLoads = np.asarray(a*load_data + b)
+        else:
+            scaledLoads = np.column_stack((scaledLoads, a*load_data + b))
+    if scaledLoads is None:
+        return np.zeros((player_data['LprofileCom'].shape[0],1))
+    if len(scaledLoads.shape) < 2:
+        scaledLoads = scaledLoads.reshape((scaledLoads.shape[0],1))
+    print(f'# {type} loads: {scaledLoads.shape[1]}')
+    if remove_mean:
+        avg = np.average(scaledLoads, axis=0)
+    totalLoad = np.zeros_like(player_data['LprofileCom']['load'])
+    if remove_mean:
+        scaledLoads -= np.concatenate([np.reshape(avg, (1,len(scaledLoads[1,:]))) for i in range(scaledLoads.shape[0])])
+    for i in range(scaledLoads.shape[1]):
+        totalLoad += scaledLoads[:,i]
+    return totalLoad
+
+    
 class PlotSpec:
     def __init__(self, title, yaxis, ylabel, log_y=True, xaxis='i_iter', xlabel='Iteration Count'):
         self.title = title
@@ -360,7 +426,6 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, sca
         weights = Vh.transpose()[:,col_perm] * weights
     else:
         X, y = load_svmlight_file(os.path.join('..', 'data', dataset+'.svm'))
-    print(weights)
     regression = X*weights
     t = np.linspace(0, len(y)//4, len(y))
 
@@ -399,7 +464,7 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, sca
     fig.tight_layout()
     return fig
 
-def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=False, low_rank_cols=False, gldmodel_dir='../gridlab-d_models/models/riverside-allPV'):
+def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=False, remove_mean=True, low_rank_cols=False, gldmodel_dir='../gridlab-d_models/models/riverside-allPV'):
     data_dir = os.path.join('data', dataset, 'features', str(k))
     index = np.asarray(np.load(os.path.join(data_dir, 'index.npy'), allow_pickle=True), dtype=np.int)
     index_test = np.asarray(np.load(os.path.join(data_dir, 'index_test.npy'), allow_pickle=True), dtype=np.int)
@@ -411,7 +476,6 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
     weights = weights.reshape(len(weights))
 
     X, y = load_svmlight_file(os.path.join('..', 'data', dataset+'.svm'))
-    regression = X*weights
     t = np.linspace(0, len(y)//4, len(y))
 
     # load profiles
@@ -430,16 +494,18 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
     else:
         ptSize = 16
         lineWidth = 1
-    fig = plt.figure('Profiles and Regression')
+    # fig, ax = plt.subplots(2, 1, sharex=True, num=f"Profiles, Regression, and {'Low Rank Columns' if low_rank_cols else 'Singular Vectors'}")
+    fig, ax = plt.subplots(2, 1, sharex=True)
     if large:
-        fig.set_size_inches(16,10)
+        fig.set_size_inches(16,16)
     else:
-        fig.set_size_inches(12, 6)
+        fig.set_size_inches(10, 10)
         
     
     # plt.title(f'Linear Regression after 1 Iteration for 5 {os.path.basename(logdir).capitalize()} Connected Inverters')
+
     plt.xlabel('Time (h)', fontsize='xx-large')#, fontsize=24)
-    plt.ylabel('Voltage (V)', fontsize='xx-large')#, fontsize=24)
+    ax[1].set_ylabel('Voltage (V)', fontsize='xx-large')#, fontsize=24)
     # plt.tick_params(which='major', labelsize='large')
     def normalize(data, ref=None):
         if ref is None:
@@ -447,22 +513,43 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
         avg = np.average(ref)
         min_ = np.min(ref)
         max_ = np.max(ref)
-        return (data - avg)/(max_ - min_)
+        mag = np.linalg.norm(ref)
+        return (data)/(mag)
     
-    U, s, Vh = np.linalg.svd(X.todense())
+    if remove_mean:
+        m = np.average(X.todense(), axis=1).T
+    else:
+        m = np.zeros((1,X.shape[0]))
+    Xbar = X.todense()-np.concatenate([m for i in range(X.shape[1])]).T
+    U, s, Vh = np.linalg.svd(Xbar)
+    for i in range(Vh.shape[0]):
+        print('[', end=' ')
+        for j in range(Vh.shape[1]):
+            print(f'{Vh[j,i]:03e}', end=' ')
+        print(']')
     if low_rank_cols:
         X_1 = s[0] * U[:, 0] @ Vh[0, :]
-        plt.plot(t, normalize(X_1[:,0]), label=f'Rank 1 Approx')
+        ax[0].plot(t, normalize(X_1[:,0]), label=f'Rank 1 Approx')
         X_2 = X_1 + s[1] * U[:, 1] @ Vh[1, :]
-        plt.plot(t, normalize(X_2[:,0]), label=f'Rank 2 Approx')
+        ax[0].plot(t, normalize(X_2[:,0]), label=f'Rank 2 Approx')
     else:
-        plt.plot(t, normalize(U[:,0]*s[0]), label=f'Left Singular Vector {1}')
-        plt.plot(t, normalize(U[:,1]*s[1]), label=f'Left Singular Vector {2}')
-    plt.plot(t, normalize(regression), color=c_reg, label=f"Predicted PCC Voltage", linewidth=lineWidth)
+        for i in range(2):
+            ax[0].plot(t, normalize(U[:,i]*s[i]), label=f'$U_{i+1}$, $'+r'\sigma'+f'_{i+1} = {s[i]:.02f}$')
+    
+    totalLoad = sum(data['load'] for data in profile_data.values())
+    ax[0].plot(t, normalize(totalLoad), label="Total Load", linewidth=lineWidth)
+    
     for (name, data) in profile_data.items():
-        plt.plot(t, normalize(data['load']), label=name, linewidth=lineWidth)
+        ax[0].plot(t, normalize(data['load'] - totalLoad/2), label=name, linewidth=lineWidth)
 
-    plt.legend(loc='best', fontsize='x-large')
+    
+    ax[0].legend(loc='best', fontsize='x-large')
+    
+    regression = X*weights
+
+    plt.plot(t, normalize(regression), color=c_reg, label=f"Predicted PCC Voltage", linewidth=lineWidth)
+
+    ax[1].legend(loc='best', fontsize='x-large')
     
     fig.tight_layout()
     return fig
@@ -590,7 +677,13 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
         saveorshow(fig, 'linear_regression.png')
 
         fig = plot_profiles_and_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
-        saveorshow(fig, 'profiles_and_regression.png')
+        saveorshow(fig, 'profiles_regression_and_sv-remove_mean.png')
+
+        fig = plot_profiles_and_regression(k, dataset, log_path, large=large, remove_mean=False, check_iter=linreg_iter)
+        saveorshow(fig, 'profiles_regression_and_sv.png')
+
+        fig = plot_profiles_and_regression(k, dataset, log_path, large=large, low_rank_cols=True, check_iter=linreg_iter)
+        saveorshow(fig, 'profiles_regression_and_low_rank.png')
         if svd:
             fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter, scaleweights=True)
             saveorshow(fig, 'linear_regression_svd.png')
@@ -645,8 +738,7 @@ def _topology_single_rank(k, dataset, logdir, saveorshow, iterslice=np.s_[:,:], 
     results = [(os.path.basename(path), pd.read_csv(os.path.join(path, 'result.csv')).loc[iterslice]) 
                 for path in topologies]
     fspec = FigSpec('Topology - Test Statistics')
-    print(iterslice)
-    print(results[0][1].shape)
+
     n_train, n_test = np.max(results[0][1].loc[:,'n_train']), np.max(results[0][1].loc[:,'n_test'])
     fspec = FigSpec(f'Prediction Test Statistics ({n_train}/{n_test}/{n_train+n_test}), {k} nodes')
     rmse = create_PlotSpec('rmse', log_y=False)
@@ -679,7 +771,6 @@ def _topology_all_rank(dataset, logdir, saveorshow, large=False):
             df = pd.read_csv(os.path.join(f, 'result.csv'))
             max_iter = np.max(df['i_iter'])
             df = df.loc[max_iter,:]
-            print(f"iter: {df['i_iter']}")
             df = df.append(pd.Series([int(worldsize)], index=['worldsize']))
             if keys is None:
                 keys = df.index
@@ -704,7 +795,6 @@ def _topology_all_rank(dataset, logdir, saveorshow, large=False):
     l2_rel = create_PlotSpec('l2_rel', log_y=False, xaxis='worldsize', xlabel='# MPI Nodes')
     max_rel = create_PlotSpec('max_rel', log_y=False, xaxis='worldsize', xlabel='# MPI Nodes')
     for (topo, data) in results.items():
-        print(f"{topo}: RMSE={data['rmse']}")
         fspec.add_plot(rmse, data=data, label=topo, pos=np.s_[0,:])
         fspec.add_plot(r2, data=data, label=topo, pos=np.s_[1,:])
         fspec.add_plot(l2_rel, data=data, label=topo, pos=np.s_[2,:])
