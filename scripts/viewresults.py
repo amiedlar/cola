@@ -16,11 +16,11 @@ import logging
 def getPlayerData(modelPath, outputPath='output', overwrite=False, return_gld=False):
     # check if output exists
     if os.path.exists(os.path.join(outputPath, 'master.glm')) and not overwrite:
-        print('|-> GLD model files already generated, continuing')
         # load post-run data
         gld = GLD(os.path.join(outputPath, 'master.glm'))
     else:    
         # load model
+        print('|-> GLD output files not found, running model')
         gld = GLD(os.path.join(modelPath, 'master.glm'))
         clock = gld.get_all('clock')[0]
         clock.set_start_time(datetime(2001, 5, 1))
@@ -464,7 +464,7 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, sca
     fig.tight_layout()
     return fig
 
-def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=False, remove_mean=True, low_rank_cols=False, gldmodel_dir='../gridlab-d_models/models/riverside-allPV'):
+def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=False, remove_mean=True, print_svd=False, low_rank_cols=False, gldmodel_dir='../gridlab-d_models/models/riverside-allPV'):
     data_dir = os.path.join('data', dataset, 'features', str(k))
     index = np.asarray(np.load(os.path.join(data_dir, 'index.npy'), allow_pickle=True), dtype=np.int)
     index_test = np.asarray(np.load(os.path.join(data_dir, 'index_test.npy'), allow_pickle=True), dtype=np.int)
@@ -474,15 +474,16 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
     else:
         weights = np.load(os.path.join(logdir, f'weight_epoch_{check_iter}.npy'), allow_pickle=True)
     weights = weights.reshape(len(weights))
-
+    print(weights)
     X, y = load_svmlight_file(os.path.join('..', 'data', dataset+'.svm'))
     t = np.linspace(0, len(y)//4, len(y))
 
     # load profiles
-    profile_data = getPlayerData(gldmodel_dir)
-    c_train = (0.95294118, 0.56078431, 0.14901961)
-    c_test = (0.39215686, 0.77254902, 0.93333333)
-    c_reg = (0.29411765, 0.32941176, 0.36470588)
+    import re
+    base_dataset = re.sub(r'\_.*', '', dataset)
+    profile_data = getPlayerData(gldmodel_dir, outputPath="output/" + base_dataset)
+
+    # set plot parameters
     if large:
         plt.rc('font', size=24, weight=300)
         # plt.rc('xlabel', )
@@ -491,19 +492,100 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
         plt.rc('ytick', labelsize='large')
         ptSize = 49
         lineWidth = 4
-    else:
-        ptSize = 16
-        lineWidth = 1
-    # fig, ax = plt.subplots(2, 1, sharex=True, num=f"Profiles, Regression, and {'Low Rank Columns' if low_rank_cols else 'Singular Vectors'}")
+
     fig, ax = plt.subplots(2, 1, sharex=True)
     if large:
         fig.set_size_inches(16,16)
     else:
         fig.set_size_inches(10, 10)
-        
-    
-    # plt.title(f'Linear Regression after 1 Iteration for 5 {os.path.basename(logdir).capitalize()} Connected Inverters')
 
+    fig.suptitle('Low Profiles and SVD of $A'+("'$" if remove_mean else '$'))
+    
+    plt.xlabel('Time (h)', fontsize='xx-large')#, fontsize=24)
+    ax[1].set_ylabel('Voltage (V)', fontsize='xx-large')#, fontsize=24)
+    # plt.tick_params(which='major', labelsize='large')
+    def normalize(data, ref=None):
+        if ref is None:
+            ref = data
+        avg = np.average(ref)
+        min_ = np.min(ref)
+        max_ = np.max(ref)
+        mag = np.linalg.norm(ref)
+        return (data)/(mag)
+
+    # add plots
+    if remove_mean:
+        m = np.average(X.todense(), axis=1).T
+    else:
+        m = np.zeros((1,X.shape[0]))
+    Xbar = X.todense()-np.concatenate([m for i in range(X.shape[1])]).T
+    U, s, Vh = np.linalg.svd(Xbar)
+    if print_svd:
+        np.set_printoptions(precision=3, sign='+')
+        print(f'|-> s = {s}')
+        print('|-> V = ')
+        for i in range(Vh.shape[0]):
+            print(f'\t{Vh[:,i].T}')
+    
+    totalLoad = sum(data['load'] for data in profile_data.values())
+    ax[0].plot(t, normalize(totalLoad), label="Com + Res")
+    ax[0].plot(t, normalize(profile_data['LprofileRes']['load'] - profile_data['LprofileCom']['load']), label="Res - Com")
+    if low_rank_cols:
+        X_1 = s[0] * U[:, 0] @ Vh[0, :]
+        ax[0].plot(t, normalize(X_1[:,0]), label=f'Rank 1 Approx')
+        X_2 = X_1 + s[1] * U[:, 1] @ Vh[1, :]
+        ax[0].plot(t, normalize(X_2[:,0]), label=f'Rank 2 Approx')
+    else:
+        for i in range(5):
+            ax[0].plot(t, normalize(U[:,i]), linestyle='-.', label=f'$U_{i+1}$, $'+r'\sigma'+f'_{i+1} = {s[i]:.02e}$')
+    
+
+    ax[0].legend(loc='best', fontsize='x-large')
+    # if remove_mean:
+    # for (name, data) in profile_data.items():
+
+    regression = X*weights
+    plt.plot(t, regression, label=f"Predicted PCC Voltage")
+    ax[1].legend(loc='best', fontsize='x-large')
+    
+    fig.tight_layout()
+    return fig
+
+def plot_power_and_regression(k, dataset, logdir, check_iter=None, large=False, remove_mean=True, print_svd=False, gldmodel_dir='../gridlab-d_models/models/riverside-allPV'):
+    data_dir = os.path.join('data', dataset, 'features', str(k))
+    index = np.asarray(np.load(os.path.join(data_dir, 'index.npy'), allow_pickle=True), dtype=np.int)
+    index_test = np.asarray(np.load(os.path.join(data_dir, 'index_test.npy'), allow_pickle=True), dtype=np.int)
+    from sklearn.datasets import load_svmlight_file
+    if check_iter is None:
+        weights = np.load(os.path.join(logdir, f'weight.npy'), allow_pickle=True)
+    else:
+        weights = np.load(os.path.join(logdir, f'weight_epoch_{check_iter}.npy'), allow_pickle=True)
+    weights = weights.reshape(len(weights))
+    print(weights)
+    X, y = load_svmlight_file(os.path.join('..', 'data', dataset+'.svm'))
+    t = np.linspace(0, len(y)//4, len(y))
+
+    # load profiles
+    import re
+    base_dataset = re.sub(r'\_.*', '', dataset)
+    profile_data = getPlayerData(gldmodel_dir, outputPath="output/" + base_dataset)
+
+    # set plot parameters
+    if large:
+        plt.rc('font', size=24, weight=300)
+        # plt.rc('xlabel', )
+        plt.rc('xtick', labelsize='large')
+        # plt.rc('ylabel', )
+        plt.rc('ytick', labelsize='large')
+        ptSize = 49
+        lineWidth = 4
+
+    fig, ax = plt.subplots(2, 1, sharex=True)
+    if large:
+        fig.set_size_inches(16,16)
+    else:
+        fig.set_size_inches(10, 10)
+    fig.suptitle('Average PV Generation and SVD of $A'+("'$" if remove_mean else '$'))
     plt.xlabel('Time (h)', fontsize='xx-large')#, fontsize=24)
     ax[1].set_ylabel('Voltage (V)', fontsize='xx-large')#, fontsize=24)
     # plt.tick_params(which='major', labelsize='large')
@@ -516,38 +598,37 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
         mag = np.linalg.norm(ref)
         return (data)/(mag)
     
+    power_path = f'../data/{base_dataset}-power.npy'
+    power = None
+    if os.path.exists(power_path):
+        power = np.load(power_path, allow_pickle=True)
+        power_avg = np.average(power, axis=1)
+
+    # add plots
     if remove_mean:
         m = np.average(X.todense(), axis=1).T
     else:
         m = np.zeros((1,X.shape[0]))
     Xbar = X.todense()-np.concatenate([m for i in range(X.shape[1])]).T
     U, s, Vh = np.linalg.svd(Xbar)
-    for i in range(Vh.shape[0]):
-        print('[', end=' ')
-        for j in range(Vh.shape[1]):
-            print(f'{Vh[j,i]:03e}', end=' ')
-        print(']')
-    if low_rank_cols:
-        X_1 = s[0] * U[:, 0] @ Vh[0, :]
-        ax[0].plot(t, normalize(X_1[:,0]), label=f'Rank 1 Approx')
-        X_2 = X_1 + s[1] * U[:, 1] @ Vh[1, :]
-        ax[0].plot(t, normalize(X_2[:,0]), label=f'Rank 2 Approx')
-    else:
-        for i in range(2):
-            ax[0].plot(t, normalize(U[:,i]*s[i]), label=f'$U_{i+1}$, $'+r'\sigma'+f'_{i+1} = {s[i]:.02f}$')
+    if print_svd:
+        np.set_printoptions(precision=3, sign='+')
+        print(f'|-> s = {s}')
+        print('|-> V = ')
+        for i in range(Vh.shape[0]):
+            print(f'\t{Vh[:,i].T}')
     
-    totalLoad = sum(data['load'] for data in profile_data.values())
-    ax[0].plot(t, normalize(totalLoad), label="Total Load", linewidth=lineWidth)
+    ax[0].plot(t, normalize(power_avg), label='Average PV Power (W)')
     
-    for (name, data) in profile_data.items():
-        ax[0].plot(t, normalize(data['load'] - totalLoad/2), label=name, linewidth=lineWidth)
-
+    for i in range(4):
+        ax[0].plot(t, normalize(U[:,i]), linestyle='-.', label=f'$U_{i+1}$, $'+r'\sigma'+f'_{i+1} = {s[i]:.02e}$')
+    
     
     ax[0].legend(loc='best', fontsize='x-large')
     
     regression = X*weights
 
-    plt.plot(t, normalize(regression), color=c_reg, label=f"Predicted PCC Voltage", linewidth=lineWidth)
+    plt.plot(t, regression, label=f"Predicted PCC Voltage")
 
     ax[1].legend(loc='best', fontsize='x-large')
     
@@ -670,23 +751,29 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
     # saveorshow(fig, 'cert-and-gap.png')
 
     if 'n_test' in global_results:
-        fig = plot_test_statistics(k, global_results, comp_data=comp_global, large=large)
-        saveorshow(fig, 'test_statistics.png')
+        # fig = plot_test_statistics(k, global_results, comp_data=comp_global, large=large)
+        # saveorshow(fig, 'test_statistics.png')
 
         fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
         saveorshow(fig, 'linear_regression.png')
 
-        fig = plot_profiles_and_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
-        saveorshow(fig, 'profiles_regression_and_sv-remove_mean.png')
+        # fig = plot_profiles_and_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
+        # saveorshow(fig, 'profiles_regression_and_sv-remove_mean.png')
 
-        fig = plot_profiles_and_regression(k, dataset, log_path, large=large, remove_mean=False, check_iter=linreg_iter)
-        saveorshow(fig, 'profiles_regression_and_sv.png')
+        # fig = plot_profiles_and_regression(k, dataset, log_path, large=large, remove_mean=False, check_iter=linreg_iter)
+        # saveorshow(fig, 'profiles_regression_and_sv.png')
 
-        fig = plot_profiles_and_regression(k, dataset, log_path, large=large, low_rank_cols=True, check_iter=linreg_iter)
-        saveorshow(fig, 'profiles_regression_and_low_rank.png')
-        if svd:
-            fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter, scaleweights=True)
-            saveorshow(fig, 'linear_regression_svd.png')
+        # fig = plot_power_and_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
+        # saveorshow(fig, 'power_regression_and_sv-remove_mean.png')
+
+        # fig = plot_power_and_regression(k, dataset, log_path, large=large, remove_mean=False, check_iter=linreg_iter)
+        # saveorshow(fig, 'power_regression_and_sv.png')
+
+        # fig = plot_profiles_and_regression(k, dataset, log_path, large=large, low_rank_cols=True, check_iter=linreg_iter)
+        # saveorshow(fig, 'profiles_regression_and_low_rank.png')
+        # if svd:
+        #     fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter, scaleweights=True)
+        #     saveorshow(fig, 'linear_regression_svd.png')
 
     if showres:
         fig = plot_update_and_global(local_results, res, global_y='res', global_ylabel=r'$\log_{10} (\|\|x_k - x^*\|\|/\|\|x^*\|\|)$')

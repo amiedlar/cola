@@ -20,9 +20,9 @@ do
     echo -e $"\e[0m"
     
     TOPOLOGY=complete
-    run_cola_n $NEW_DATASET $MAX_WORLD_SIZE
+    run_cola_n $NEW_DATASET 5 $MAX_WORLD_SIZE
     TOPOLOGY=ring
-    run_cola_n $NEW_DATASET 3 $MAX_WORLD_SIZE
+    run_cola_n $NEW_DATASET 5 $MAX_WORLD_SIZE
     clean_dataset $DATASET
     rm -rf $JOBLIB_CACHE_DIR
 done

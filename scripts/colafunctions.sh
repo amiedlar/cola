@@ -36,6 +36,12 @@ set_cola_parameters() {
         L1_RATIO=${L1_RATIO:-1}
         LAMBDA=${LAMBDA:-1e-3}
         # LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
+    elif [[ $DATASET == 'inverters'* ]]; then
+        MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-5}
+        TRAIN_SIZE=${TRAIN_SIZE:-24}
+        L1_RATIO=${L1_RATIO:-1}
+        LAMBDA=${LAMBDA:-1e-3}
+        # LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
     elif [[ $DATASET == 'mg'* ]]; then 
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-6}
         TRAIN_SIZE=${TRAIN_SIZE:-0.7}
