@@ -73,7 +73,7 @@ class CoCoASubproblemSolver(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def standize_subproblem(self, v, w):
+    def standardize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
         pass
 
@@ -92,7 +92,7 @@ class CoCoASubproblemSolver(metaclass=ABCMeta):
         w = self.grad_f(v)
 
         # Transform to the standardized subproblem
-        self.subproblem_y = self.standize_subproblem(Akxk, w)
+        self.subproblem_y = self.standardize_subproblem(Akxk, w)
 
         self.solver.coef = xk.copy()
 
@@ -152,7 +152,7 @@ class LinearRegression(CoCoASubproblemSolver):
         from fast_cd.solver import LeastSquaresCoordSolver
         self.solver = LeastSquaresCoordSolver(max_iter=local_iters,tol=theta, warm_start=True)
 
-    def standize_subproblem(self, v, w):
+    def standardize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
         return v  - self.tau/self.sigma * w
 
@@ -235,7 +235,7 @@ class ElasticNet(CoCoASubproblemSolver):
             l1_ratio=self.l1_ratio, max_iter=local_iters,
             tol=theta, warm_start=True, random_state=self.random_state)
 
-    def standize_subproblem(self, v, w):
+    def standardize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
         return v - self.tau / self.sigma * w
 
@@ -321,7 +321,7 @@ class LogisticRegression(CoCoASubproblemSolver):
             l1_ratio=self.l1_ratio, max_iter=local_iters,
             tol=theta, warm_start=True, random_state=self.random_state)
 
-    def standize_subproblem(self, v, w):
+    def standardize_subproblem(self, v, w):
         """Convert subproblem to a standard form so that local solver can solve."""
         return v - self.tau / self.sigma * w
 
@@ -383,7 +383,7 @@ class LinearSVM(CoCoASubproblemSolver):
             warm_start=True,
             random_state=self.random_state)
 
-    def standize_subproblem(self, v, w, Akxk):
+    def standardize_subproblem(self, v, w, Akxk):
         """Convert subproblem to a standard form so that local solver can solve."""
         w = np.asarray(w)
         return self.Ak.T @ (self.sigma / self.tau * Akxk - w)
@@ -402,7 +402,7 @@ class LinearSVM(CoCoASubproblemSolver):
         w = self.grad_f(v)
 
         # Transform to the standardized subproblem
-        self.subproblem_y = self.standize_subproblem(Akxk, w, Akxk)
+        self.subproblem_y = self.standardize_subproblem(Akxk, w, Akxk)
 
         self.solver.coef = xk.copy()
 
