@@ -37,10 +37,11 @@ import os
 @click.option('--c', type=float, help='Constant in the LinearSVM.')
 @click.option('--ckpt_freq', type=int, default=10, help='')
 @click.option('--exit_time', default=1000.0, help='The maximum running time of a node.')
+@click.option('--fit-intercept', is_flag=True)
 @click.option('--verbose', default=1, type=click.IntRange(0, 3, clamp=True), help='Verbosity level, 0 is silent, 3 is full debug')
 def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, split_by, random_state,
          algoritmname, max_global_steps, local_iters, solvername, output_dir, exit_time, lambda_, l1_ratio, theta,
-         graph_topology, c, logmode, ckpt_freq, n_connectivity, verbose):
+         graph_topology, c, logmode, ckpt_freq, n_connectivity, fit_intercept, verbose):
 
     # Fix gamma = 1.0 according to:
     #   Adding vs. Averaging in Distributed Primal-Dual Optimization
@@ -78,12 +79,12 @@ def main(dataset, dataset_path, dataset_size, datapoints, use_split_dataset, spl
     monitor = Monitor(solver, output_dir, ckpt_freq, graph, exit_time, split_by, logmode, algoritmname, verbose=verbose, Ak=X, Ak_test=X_test, y_test=y_test)
 
     # Always use this value throughout this project
-    Akxk, xk = run_algorithm(algoritmname, X, y, solver, gamma, theta,
+    Akxk, xk, intercept = run_algorithm(algoritmname, X, y, solver, gamma, theta,
                              max_global_steps, local_iters, world_size,
-                             graph, monitor)
+                             graph, monitor, fit_intercept=fit_intercept)
     if X_test is not None:
         monitor.show_test_statistics(xk, y.shape[0])
-    monitor.save(Akxk, xk, weightname='weight.npy', logname=f'result.csv')
+    monitor.save(Akxk, xk, intercept=intercept, weightname='weight.npy', logname=f'result.csv')
 
 
 if __name__ == '__main__':

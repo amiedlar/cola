@@ -5,7 +5,7 @@ import warnings
 from joblib import Memory
 from scipy.sparse import vstack
 from scipy.sparse import csc_matrix
-from scipy.sparse import issparse
+from scipy.sparse import issparse, isspmatrix_csr
 
 from sklearn.datasets import make_classification
 from sklearn.datasets import load_svmlight_file
@@ -301,8 +301,87 @@ def test(n_samples, n_features, rank, world_size, split_by='samples', random_sta
         return X[:, indices], y
 
 
+from sklearn.utils.validation import check_array, FLOAT_DTYPES
+from sklearn.utils.sparsefuncs import mean_variance_axis, inplace_column_scale
+from sklearn.preprocessing import normalize as f_normalize
+import numbers
+
+def _preprocess_data(X, y, fit_intercept, normalize=False, copy=True,
+                     sample_weight=None, return_mean=False, check_input=True):
+    """Center and scale data.
+    Centers data to have mean zero along axis 0. If fit_intercept=False or if
+    the X is a sparse matrix, no centering is done, but normalization can still
+    be applied. The function returns the statistics necessary to reconstruct
+    the input data, which are X_offset, y_offset, X_scale, such that the output
+        X = (X - X_offset) / X_scale
+    X_scale is the L2 norm of X - X_offset. If sample_weight is not None,
+    then the weighted mean of X and y is zero, and not the mean itself. If
+    return_mean=True, the mean, eventually weighted, is returned, independently
+    of whether X was centered (option used for optimization with sparse data in
+    coordinate_descend).
+    This is here because nearly all linear models will want their data to be
+    centered. This function also systematically makes y consistent with X.dtype
+    """
+    if isinstance(sample_weight, numbers.Number):
+        sample_weight = None
+    if sample_weight is not None:
+        sample_weight = np.asarray(sample_weight)
+
+    if check_input:
+        X = check_array(X, copy=copy, accept_sparse=['csr', 'csc'],
+                        dtype=FLOAT_DTYPES)
+    elif copy:
+        if issparse(X):
+            X = X.copy()
+        else:
+            X = X.copy(order='K')
+
+    y = np.asarray(y, dtype=X.dtype)
+
+    if fit_intercept:
+        if issparse(X):
+            X_offset, X_var = mean_variance_axis(X, axis=0)
+            if not return_mean:
+                X_offset[:] = X.dtype.type(0)
+
+            if normalize:
+
+                # TODO: f_normalize could be used here as well but the function
+                # inplace_csr_row_normalize_l2 must be changed such that it
+                # can return also the norms computed internally
+
+                # transform variance to norm in-place
+                X_var *= X.shape[0]
+                X_scale = np.sqrt(X_var, X_var)
+                del X_var
+                X_scale[X_scale == 0] = 1
+                inplace_column_scale(X, 1. / X_scale)
+            else:
+                X_scale = np.ones(X.shape[1], dtype=X.dtype)
+
+        else:
+            X_offset = np.average(X, axis=0, weights=sample_weight)
+            X -= X_offset
+            if normalize:
+                X, X_scale = f_normalize(X, axis=0, copy=False,
+                                         return_norm=True)
+            else:
+                X_scale = np.ones(X.shape[1], dtype=X.dtype)
+        y_offset = np.average(y, axis=0, weights=sample_weight)
+        y = y - y_offset
+    else:
+        X_offset = np.zeros(X.shape[1], dtype=X.dtype)
+        X_scale = np.ones(X.shape[1], dtype=X.dtype)
+        if y.ndim == 1:
+            y_offset = X.dtype.type(0)
+        else:
+            y_offset = np.zeros(y.shape[1], dtype=X.dtype)
+
+    return X, y, X_offset, y_offset, X_scale
+
+
 def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split_by, dataset_path=None, random_state=42,
-                         transpose=True, verbose=1):
+                         transpose=True, verbose=1, fit_intercept=False, normalize=False):
     r"""
     Assume the data_dir has following structure:
 
@@ -363,6 +442,7 @@ def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split
         if issplit:
             X_test = X_test.T
 
+    
     if isinstance(X, np.ndarray) and not X.flags['F_CONTIGUOUS']:
         # The local coordinate solver (like scikit-learn's ElasticNet) requires X to be Fortran contiguous.
         # Since the time spent on converting the matrix can be very long, and CoCoA need to call solvers every round,
@@ -371,6 +451,21 @@ def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split
         if issplit:
             X_test = np.asfortranarray(X_test)
 
+    # n_train = X.shape[0]
+    # if issplit:
+    #     if issparse(X):
+    #         X = vstack((X, X_test))
+    #     else:
+    #         X = np.vstack((X, X_test))
+    #     y = np.vstack((y, y_test))
+    # X, y, X_offset, y_offset, X_scale = _preprocess_data(X, y, fit_intercept, normalize, copy=False)
+    # intercept = (X_offset, y_offset, X_scale)
+    # if issplit:
+    #     X_test = X[n_train:, :]
+    #     X = X[:n_train, :]
+    #     y_test = y[n_train:]
+    #     y = y[:n_train]
+    
     if issparse(X):
         # For coordinate descent
         X = csc_matrix(X)
@@ -378,7 +473,7 @@ def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split
             X_test = csc_matrix(X_test)
 
     # X, y, features_in_partition, n_samples, n_features
-    return X, y, X_test, y_test
+    return X, y, X_test, y_test#, intercept
 
 
 def load_dataset(name, rank, world_size, dataset_size, datapoints, split_by, dataset_path=None, random_state=42, verbose=1):

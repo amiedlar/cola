@@ -13,7 +13,7 @@ colatools load $DATASET \
 echo -e $"\e[0m"
 
 echo -e $"|-> Running CoLA, world size=$K, topology=$TOPOLOGY"
-GLOBAL_STEPS=50
+GLOBAL_STEPS=300
 run_cola $DATASET $K
 
 clean_dataset $DATASET

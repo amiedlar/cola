@@ -26,15 +26,17 @@ set_cola_parameters() {
         # LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
     elif [[ $DATASET == 'rderms16'* ]]; then
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-16}
-        TRAIN_SIZE=${TRAIN_SIZE:-16}
-        L1_RATIO=${L1_RATIO:-0}
+        TRAIN_SIZE=${TRAIN_SIZE:-24}
+        L1_RATIO=${L1_RATIO:-0.9}
         # LINREG_ITER=${LINREG_ITER:-'--linreg-iter 1'}
-        LAMBDA=${LAMBDA:-1e-4}
+        LINREG_ITER=${LINREG_ITER:-'--large'}
+        # LAMBDA=${LAMBDA:-1e-2}
+        LAMBDA=${LAMBDA:-0.01467}
     elif [[ $DATASET == 'rderms'* ]]; then
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-5}
         TRAIN_SIZE=${TRAIN_SIZE:-20}
-        L1_RATIO=${L1_RATIO:-1}
-        LAMBDA=${LAMBDA:-1e-4}
+        L1_RATIO=${L1_RATIO:-0.8}
+        LAMBDA=${LAMBDA:-1e-3}
         LINREG_ITER=${LINREG_ITER:-'--large'}
     elif [[ $DATASET == 'inverters'* ]]; then
         MAX_WORLD_SIZE=${MAX_WORLD_SIZE:-5}
@@ -78,6 +80,14 @@ set_cola_parameters() {
     else
         OVERSUB_FLAG=''
     fi
+    declare -g FIT_INTERCEPT=${FIT_INTERCEPT:-false}
+    echo -e $"|---> with fit_intercept="$FIT_INTERCEPT
+    if [ $FIT_INTERCEPT = true ]; then
+        FIT_INTERCEPT='--fit-intercept';
+    else
+        FIT_INTERCEPT=''
+    fi
+    
     declare -g VERBOSE=${V:-1}
     if [[ $VERBOSE -gt 1 ]]; then
         VERBOSE_FLAG='-v';
@@ -111,7 +121,7 @@ run_cola_n() {
     fi
     echo "$DATASET, $START, $N"
 
-    for (( WORLD_SIZE=$START; WORLD_SIZE<=$N; WORLD_SIZE++ ))
+    for (( WORLD_SIZE=$START; WORLD_SIZE<=$N; WORLD_SIZE+=4 ))
     do
         run_cola $DATASET $WORLD_SIZE
     done
@@ -143,7 +153,7 @@ run_cola() {
         --algoritmname $GLOBAL_ALG \
         --use_split_dataset \
         --random_state $RANDOM_STATE \
-        --verbose $VERBOSE
+        --verbose $VERBOSE $FIT_INTERCEPT
     # Save result plot
     if [ $PLOT = true ]; then
         echo -e $"|---> Saving result plots to '$OUT_DIR/$DATASET/$K_l/$TOPOLOGY/', linreg_iter=$LINREG_ITER";

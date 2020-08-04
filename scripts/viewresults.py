@@ -139,12 +139,14 @@ class FigSpec:
 
         if large:
             plt.rc('font', size=24)
-            # plt.rc('axes', titlesize='large')
-            # plt.rc('axes', labelsize='large')
-            # plt.rc('xtick', labelsize='medium')    # fontsize of the tick labels
-            # plt.rc('ytick', labelsize='medium')    # fontsize of the tick labels
-            # plt.rc('legend', fontsize='large')    # legend fontsize
-            # plt.rc('figure', titlesize='x-large')  # fontsize of the figure title
+            plt.rc('axes', titlesize='large')
+            plt.rc('axes', labelsize='large')
+            plt.rc('xtick', labelsize='large')    # fontsize of the tick labels
+            plt.rc('ytick', labelsize='large')    # fontsize of the tick labels
+            # plt.rc('title', fontsize='x-large')    # fontsize of the tick labels
+            # plt.rc('suptitle', fontsize='x-large')    # fontsize of the tick labels
+            plt.rc('legend', fontsize='large')    # legend fontsize
+            plt.rc('figure', titlesize='x-large')  # fontsize of the figure title
         self.fig.suptitle(self.name)#, fontsize='x-large') 
 
         n_plots = len(self.plots)
@@ -250,19 +252,19 @@ def plot_local_cert(k, local, xaxis='i_iter', xlabel='global iteration step', co
 
 def plot_duality_gap(k, data, xaxis='i_iter', xlabel='global iteration step', comp_data=None, large=False):
     # Plot primal and dual
-    fspec = FigSpec(f'Global Results, {k} nodes', data=data, comp_data=comp_data)
+    fspec = FigSpec(f'Duality Gap, {k} nodes', data=data, comp_data=comp_data)
 
-    primal = create_PlotSpec('P', xaxis=xaxis, xlabel=xlabel)
-    fspec.add_plot(primal)
+    # primal = create_PlotSpec('P', xaxis=xaxis, xlabel=xlabel)
+    # fspec.add_plot(primal)
 
-    dual = create_PlotSpec('D', xaxis=xaxis, xlabel=xlabel)
-    fspec.add_plot(dual)
+    # dual = create_PlotSpec('D', xaxis=xaxis, xlabel=xlabel)
+    # fspec.add_plot(dual)
 
     gap = create_PlotSpec('gap', xaxis=xaxis, xlabel=xlabel)
-    fspec.add_plot(gap)
+    fspec.add_plot(gap, label='Ring')
 
-    gap_rel = create_PlotSpec('gap_rel', xaxis=xaxis, xlabel=xlabel)
-    fspec.add_plot(gap_rel)
+    # gap_rel = create_PlotSpec('gap_rel', xaxis=xaxis, xlabel=xlabel)
+    # fspec.add_plot(gap_rel)
 
     fspec.draw(large=large)
     return fspec.fig
@@ -353,14 +355,14 @@ def plot_test_statistics(k, data, xaxis='i_iter', xlabel='global iteration step'
 def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, scaleweights=False):
     X, y, t, ind = _load_data(k, dataset, ret_split_index=True)
     weights = _load_weights(logdir, check_iter, True)
-    regression = X*weights
+    regression = _predict(X, weights)
     index, index_test = ind
     from sklearn.linear_model import Lasso
     solver = Lasso(alpha=1e-4, fit_intercept=False)
     comp_y = solver.fit(X.todense()[index,:], y[index]).predict(X)
 
-    print(solver.coef_)
-    print(solver.intercept_)
+    # print(solver.coef_)
+    # print(solver.intercept_)
 
     if large:
         plt.rc('font', size=24, weight=300)
@@ -410,7 +412,7 @@ def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, sca
     # c_overvoltage = rgb2color(242, 220, 219) # light red
     # ylim = plt.gca().get_ylim()
     # plt.fill_between(t, ylim[0], 1.05*7200, color=c_nominal, zorder=0)
-    plt.plot(t, [1.05*7200]*len(t), color='black', linestyle=':', linewidth=1, zorder=0)
+    # plt.plot(t, [1.05*7200]*len(t), color='black', linestyle=':', linewidth=1, zorder=0)
     
     fig.tight_layout()
     return fig
@@ -461,7 +463,7 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
     # if remove_mean:
     # for (name, data) in profile_data.items():
 
-    regression = X*weights
+    regression = _predict(X, weights)
     plt.plot(t, regression, label=f"Predicted PCC Voltage")
     ax[1].legend(loc='best', fontsize='x-large')
     
@@ -508,7 +510,7 @@ def plot_power_and_regression(k, dataset, logdir, check_iter=None, large=False, 
     ax[0] = _add_singular_vectors_to_ax(ax[0], t, X, 3, remove_mean, print_svd, normalize)
     ax[0].legend(loc='best', fontsize='x-large')
     
-    regression = X*weights
+    regression = _predict(X, weights)
 
     ax[1].plot(t, regression, label=f"Predicted PCC Voltage")
     ax[1].set_ylabel('Voltage (V)', fontsize='xx-large')#, fontsize=24)
@@ -530,7 +532,7 @@ def plot_error_hist(k, dataset, logdir, check_iter=None, large=False):
     X, y, t, split = _load_data(k, dataset, ret_split_index=True)
     weights = _load_weights(logdir, check_iter, True)
 
-    regression = X*weights
+    regression = _predict(X, weights)
     rel_errors = 100 * np.abs(y - regression)/np.linalg.norm(y, 2)
     print(f"Max Rel Error (decentral.): {np.max(rel_errors)}")
 
@@ -682,9 +684,15 @@ def _load_weights(logdir, check_iter=None, print_weights=False):
     if check_iter is None:
         print('|---> Using final weights for regression plots')
         weights = np.load(os.path.join(logdir, f'weight.npy'), allow_pickle=True)
+        if os.path.exists(os.path.join(logdir, f'intercept.npy')):
+            intercept = np.load(os.path.join(logdir, f'intercept.npy'), allow_pickle=True)
+            weights = np.append(weights, np.asscalar(intercept))
     else:
         print(f'|---> Using epoch {check_iter} weights for regression plots')
         weights = np.load(os.path.join(logdir, f'weight_epoch_{check_iter}.npy'), allow_pickle=True)
+        if os.path.exists(os.path.join(logdir, f'intercept_epoch_{check_iter}.npy')):
+            intercept = np.load(os.path.join(logdir, f'intercept_epoch_{check_iter}.npy'), allow_pickle=True)
+            weights = np.append(weights, np.asscalar(intercept))
     weights = weights.reshape(len(weights))
     if print_weights:
         print(weights)
@@ -702,6 +710,14 @@ def _load_data(k, dataset, ret_split_index=False):
     if ret_split_index:
         return X, y, t, [index, index_test]
     return X, y, t
+
+def _predict(A, x):
+    if len(x) == A.shape[1]+1:
+        return A*x[:-1] + x[-1]
+    elif len(x) == A.shape[1]:
+        return A*x
+    else:
+        raise RuntimeError("shapes don't match") 
 
 @click.group('view-results')
 def view_results():
@@ -800,8 +816,8 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
     # fig = plot_local_cert(k, local_results, comp_data=comp_local, large=large)
     # saveorshow(fig, 'local-cert.png')
 
-    # fig = plot_minimizers(k, global_results, comp_data=comp_global, large=large)
-    # saveorshow(fig, 'minimizers.png')
+    fig = plot_minimizers(k, global_results, comp_data=comp_global, large=large)
+    saveorshow(fig, 'minimizers.png')
 
     # fig = plot_minimizers_end(k, global_results, comp_data=comp_global, large=large)
     # saveorshow(fig, 'minimizers-last-half.png')
@@ -809,26 +825,25 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
     # fig = plot_minimizers_exact(k, global_results, comp_data=comp_global, large=large)
     # saveorshow(fig, 'minimizers-exact.png')
 
-    # fig = plot_duality_gap(k, global_results, comp_data=comp_global, large=large)
-    # saveorshow(fig, 'duality-gap.png')
+    fig = plot_duality_gap(k, global_results, comp_data=comp_global, large=large)
+    saveorshow(fig, 'duality-gap.png')
 
-    # fig = plot_update_and_global(local_results, global_results, large=large)
-    # saveorshow(fig, 'update-and-gap.png')
+    fig = plot_update_and_global(local_results, global_results, large=large)
+    saveorshow(fig, 'update-and-gap.png')
 
     # fig = plot_cert_and_global(local_results, global_results, large=large)
     # saveorshow(fig, 'cert-and-gap.png')
 
     
-    fig = plot_power_load_and_sv(k, dataset, log_path, large=False, print_svd=True, check_iter=linreg_iter)
-    saveorshow(fig, 'load+power+svd+voltages.png')
+    # fig = plot_power_load_and_sv(k, dataset, log_path, large=False, print_svd=True, check_iter=linreg_iter)
+    # saveorshow(fig, 'load+power+svd+voltages.png')
 
     if 'n_test' in global_results:
-        pass
         # fig = plot_test_statistics(k, global_results, comp_data=comp_global, large=large)
         # saveorshow(fig, 'test_statistics.png')
 
-        # fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
-        # saveorshow(fig, 'linear_regression.png')
+        fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter)
+        saveorshow(fig, 'linear_regression.png')
 
         # fig = plot_error_hist(k, dataset, log_path, large=large, check_iter=linreg_iter)
         # saveorshow(fig, 'rel_errors.png')
@@ -887,6 +902,7 @@ def topology(k, dataset, logdir, save, savedir, show, miniter, maxiter, large):
     else:
         save_path = os.path.join(save_path, f'{k:0>2}', 'topology')
         os.makedirs(save_path, exist_ok=True)
+        _topology_single_rank_gap(k, dataset, logdir, saveorshow, iterslice=np.s_[miniter:maxiter,:], large=large)
         _topology_single_rank(k, dataset, logdir, saveorshow, iterslice=np.s_[miniter:maxiter,:], large=large)
 
     
@@ -916,6 +932,26 @@ def _topology_single_rank(k, dataset, logdir, saveorshow, iterslice=np.s_[:,:], 
         fspec.add_plot(max_rel, data=data, label=topo, pos=np.s_[2,:])
     fspec.draw(override_height=3, large=large)
     saveorshow(fspec.fig, f'topology_test-stats_{n_train}-{n_test}-{n_train+n_test}_{k:0>2}-nodes.png')
+
+def _topology_single_rank_gap(k, dataset, logdir, saveorshow, iterslice=np.s_[:,:], large=False):
+    log_path = os.path.join(logdir, dataset, f'{k:0>2}')
+
+    topologies = [f.path for f in os.scandir(log_path) if f.is_dir()]
+    if len(topologies) == 0:
+        print('no logs found')
+        return
+
+    results = [(os.path.basename(path), pd.read_csv(os.path.join(path, 'result.csv')).loc[iterslice]) 
+                for path in topologies]
+    fspec = FigSpec(f'Topology - Duality Gap, {k} nodes')
+
+    gap = create_PlotSpec('gap')
+    
+    for (topo, data) in results:
+        fspec.add_plot(gap, data=data, label=topo, pos=np.s_[:,:])
+        
+    fspec.draw(override_height=2, large=large)
+    saveorshow(fspec.fig, f'duality-gap_topology.png')
 
 def _topology_all_rank(dataset, logdir, saveorshow, large=False):
     log_path = os.path.join(logdir, dataset)

@@ -5,7 +5,7 @@ import numpy as np
 from . import communication as comm
 
 
-def run_algorithm(algorithm, Ak, b, solver, gamma, theta, max_global_steps, local_iters, n_nodes, graph, monitor):
+def run_algorithm(algorithm, Ak, b, solver, gamma, theta, max_global_steps, local_iters, n_nodes, graph, monitor, fit_intercept=False):
     r"""Run cocoa family algorithms."""
     with warnings.catch_warnings():
         # warnings.filterwarnings(
@@ -15,19 +15,25 @@ def run_algorithm(algorithm, Ak, b, solver, gamma, theta, max_global_steps, loca
 
         comm.barrier()
         if algorithm == 'cola':
-            Akxk, xk = cola(Ak, b, solver, gamma, theta,
-                            max_global_steps, local_iters, n_nodes, graph, monitor)
+            Akxk, xk, intercept = cola(Ak, b, solver, gamma, theta,
+                            max_global_steps, local_iters, n_nodes, graph, monitor, fit_intercept)
         # elif algorithm == 'cocoa':
         #     Akxk, xk = cocoa(Ak, b, solver, gamma, theta,
         #                     max_global_steps, local_iters, n_nodes, monitor)
         else:
             raise NotImplementedError()
-    return Akxk, xk
+    return Akxk, xk, intercept
 
 
-def cola(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, graph, monitor):
+def cola(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, graph, monitor, fit_intercept=False):
     if gamma <= 0 or gamma > 1:
         raise ValueError("gamma should in (0, 1]: got {}".format(gamma))
+
+    from .dataset import _preprocess_data
+    Ak, b, Ak_offset, b_offset, Ak_scale = _preprocess_data(Ak.todense(), b, fit_intercept, normalize=True, return_mean=True)
+    from scipy.sparse import csc_matrix
+    Ak = csc_matrix(Ak)
+    monitor.y_offset = b_offset or 0.0
 
     # Shape of the matrix
     n_rows, n_cols = Ak.shape
@@ -57,10 +63,10 @@ def cola(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, graph, 
         averaged_v = comm.local_average(n_rows, local_lookups, local_vs)
 
         # Solve the suproblem using this estimates
-        delta_x, delta_v = localsolver.solve(averaged_v, Akxk, xk)
+        delta_xk, delta_v = localsolver.solve(averaged_v, Akxk, xk)
 
         # update local variables
-        xk += gamma * delta_x
+        xk += gamma * delta_xk
         Akxk += gamma * delta_v
 
         # update shared variables
@@ -75,16 +81,17 @@ def cola(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, graph, 
         avg_grad_f /= len(local_lookups)
         cert_cv = np.linalg.norm(localsolver.grad_f(averaged_v) - avg_grad_f, 2)
 
-        if monitor.log(averaged_v, Akxk, xk, i_iter, localsolver, delta_x, cert_cv=cert_cv):
+        _intercept = np.dot(Ak_offset, xk.T/Ak_scale) if Ak_offset is not None else 0.0 
+        if monitor.log(averaged_v, Akxk, xk, i_iter, localsolver, Ak_scale=Ak_scale, delta_xk=delta_xk, intercept=_intercept, cert_cv=cert_cv):
             if monitor.verbose >= 1 and rank == 0:
                 print(f'break @ iter {i_iter}.')
             break
 
         if (i_iter % monitor.ckpt_freq) == 0:
             monitor.save(
-                Akxk, xk, weightname='weight_epoch_{}.npy'.format(i_iter))
+                Akxk, xk/Ak_scale, intercept=_intercept, weightname='weight_epoch_{}.npy'.format(i_iter))
 
-    return Akxk, xk
+    return Akxk, xk/Ak_scale, _intercept
 
 
 from mpi4py import MPI

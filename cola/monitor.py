@@ -17,7 +17,7 @@ class Monitor(object):
     * save weight file and log files if specified;
     """
 
-    def __init__(self, solver, output_dir, ckpt_freq, graph, exit_time=None, split_by='samples', mode='local', alg='cola', Ak=None, Ak_test=None, y_test=None, verbose=1):
+    def __init__(self, solver, output_dir, ckpt_freq, graph, exit_time=None, split_by='samples', mode='local', alg='cola', Ak=None, Ak_test=None, y_test=None, y_offset=0.0, verbose=1):
         """
         Parameters
         ----------
@@ -40,6 +40,7 @@ class Monitor(object):
         self.Ak_test = Ak_test
         self.y_test = y_test
         self.do_prediction_tests = self.Ak_test is not None and self.y_test is not None
+        self.y_offset = y_offset
 
         self.rank = comm.get_rank()
         self.world_size = comm.get_world_size()
@@ -93,14 +94,14 @@ class Monitor(object):
         return self._sigma_sum
             
 
-    def log(self, vk, Akxk, xk, i_iter, solver, delta_xk=None, cert_cv=0.0):
+    def log(self, vk, Akxk, xk, i_iter, solver, Ak_scale=1, delta_xk=None, intercept=0.0, cert_cv=0.0):
         # Skip the time for logging
         self.running_time += time.time() - self.previous_time
 
         if self.mode == 'local':
             self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk, cert_cv=cert_cv)
         elif self.mode == 'global':
-            self._log_global(vk, Akxk, xk, i_iter, solver)
+            self._log_global(vk, Akxk, xk, i_iter, solver, Ak_scale)
         elif self.mode == None:
             pass
         elif self.mode == 'all':
@@ -108,7 +109,7 @@ class Monitor(object):
             self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk, cert_cv=cert_cv)
             self.records_l = self.records
             self.records = self.records_g
-            self._log_global(vk, Akxk, xk, i_iter, solver)
+            self._log_global(vk, Akxk, xk, i_iter, solver, Ak_scale=Ak_scale, intercept=intercept)
             self.records_g = self.records
             if self.verbose >= 2:
                 print(f"[{comm.get_rank()}] Certificate, Iter {self.records[-1]['i_iter']}: "
@@ -152,7 +153,7 @@ class Monitor(object):
         if self.verbose >= 2:
             print("Iter {i_iter:5}, Time {time:10.5e}: delta_xk={delta_xk:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
 
-    def _log_global(self, vk, Akxk, xk, i_iter, solver):
+    def _log_global(self, vk, Akxk, xk, i_iter, solver, Ak_scale=1, intercept=0.0):
         record = {}
         record['i_iter'] = i_iter
         record['time'] = self.running_time
@@ -203,8 +204,10 @@ class Monitor(object):
 
 
         if self.do_prediction_tests:
-            y_predict = self.Ak_test*xk
-            y_predict = comm.all_reduce(np.asarray(y_predict), op='SUM')
+            coef = xk/Ak_scale
+            y_predict = self.Ak_test*coef - intercept 
+            y_predict = comm.all_reduce(np.asarray(y_predict), op='SUM') 
+            y_predict += self.y_offset
             y_test_avg = np.average(self.y_test)
             record['n_train'] = self.solver.y.shape[0]
             record['n_test'] = self.y_test.shape[0]
@@ -221,7 +224,7 @@ class Monitor(object):
                   "g={g:10.3e}, f_conj={f_conj:10.3e}, g_conj={g_conj:10.3e}".format(**record))
                 
 
-    def save(self, Akxk, xk, weightname=None, logname=None):
+    def save(self, Akxk, xk, intercept=0.0, weightname=None, logname=None):
         rank = self.rank
         if logname:
             if self.mode == 'all':
@@ -253,14 +256,21 @@ class Monitor(object):
                 if self.verbose >= 3:
                     print(f'node {rank} weights: {weight}')
                 weight = comm.reduce(weight, root=0, op='SUM')
+                intercept = comm.reduce(intercept, root=0, op='SUM')
 
             if rank == 0:
                 weightfile = os.path.join(self.output_dir, weightname)
                 weight.dump(weightfile)
                 if self.verbose >= 2:
                     print("Weight has been save to {} on node 0".format(weightfile))
+                intercept = self.y_offset - intercept
+                if abs(intercept) > 1e-6:
+                    interceptfile = os.path.join(self.output_dir, weightname.replace('weight', 'intercept'))
+                    np.asarray([intercept]).dump(interceptfile)
+                    if self.verbose >= 2:
+                        print("Intercept ({}) has been save to {} on node 0".format(intercept, interceptfile))
 
-    def show_test_statistics(self, xk_final, n_train, Ak_test=None, y_test=None):
+    def show_test_statistics(self, xk_final, n_train, intercept=0, Ak_test=None, y_test=None):
         comm.barrier()
         if Ak_test is None:
             Ak_test = self.Ak_test
@@ -277,8 +287,9 @@ class Monitor(object):
             max_rel = self.records_g[-1]['max_rel']
             l2_rel = self.records_g[-1]['l2_rel']
         else:
-            y_predict = Ak_test*xk_final
-            y_predict = comm.all_reduce(np.asarray(y_predict), op='SUM')
+            y_predict = Ak_test*xk_final - intercept
+            y_predict = comm.all_reduce(np.asarray(y_predict), op='SUM') 
+            y_predict += self.y_offset
 
             y_test_avg = np.average(y_test)
             rmse = np.sqrt(np.average((y_predict - y_test)**2))
