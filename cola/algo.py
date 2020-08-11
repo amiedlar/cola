@@ -10,19 +10,16 @@ from . import communication as comm
 def run_algorithm(algorithm, Ak, b, solver, gamma, theta, max_global_steps, local_iters, graph, monitor, fit_intercept=False, normalize=False):
     r"""Run cocoa family algorithms."""
     with warnings.catch_warnings():
-        # warnings.filterwarnings(
-        #     "ignore",
-        #     'Objective did not converge. You might want to increase the number of iterations. '
-        #     'Fitting data with very small alpha may cause precision problems.')
+        warnings.filterwarnings(
+            "ignore",
+            'Objective did not converge. You might want to increase the number of iterations. '
+            'Fitting data with very small alpha may cause precision problems.')
 
         comm.barrier()
         if algorithm == 'cola':
             model = Cola(gamma, solver, theta, fit_intercept, normalize)
             monitor.init(model)
             model = model.fit(Ak, b, graph, monitor, max_global_steps, local_iters)
-        # elif algorithm == 'cocoa':
-        #     Akxk, xk = cocoa(Ak, b, solver, gamma, theta,
-        #                     max_global_steps, local_iters, n_nodes, monitor)
         else:
             raise NotImplementedError()
     return model
@@ -90,14 +87,8 @@ class Cola:
             comm.p2p_communicate_neighborhood_tensors(
                 rank, local_lookups, local_vs)
 
-            avg_grad_f = np.zeros_like(averaged_v)
-            for node_id in local_lookups:
-                avg_grad_f += self.localsolver.grad_f(local_vs[node_id])
-            avg_grad_f /= len(local_lookups)
-            cert_cv = np.linalg.norm(self.localsolver.grad_f(averaged_v) - avg_grad_f, 2)
-
             intercept_ = -self.intercept
-            if monitor and monitor.log(averaged_v, Akxk, self.coef_, i_iter, self.localsolver, delta_xk=delta_xk, delta_vk=delta_v, intercept=intercept_, cert_cv=cert_cv):
+            if monitor and monitor.log(averaged_v, Akxk, self.coef_, i_iter, self.localsolver, delta_xk=delta_xk, delta_vk=delta_v, intercept=intercept_):
                 if monitor.verbose >= 1 and rank == 0:
                     print(f'break @ iter {i_iter}.')
                 break
@@ -105,16 +96,11 @@ class Cola:
             if monitor and monitor.ckpt_freq > 0 and (i_iter % monitor.ckpt_freq) == 0:
                 monitor.save(Akxk, intercept=intercept_, modelname='model_epoch_{}.pickle'.format(i_iter))
         
-        self._finalize()
+        self.is_fit = True
 
         return self
 
     def predict(self, A):
-        world_size = 0
-        try:
-            world_size = comm.get_world_size()
-        except:
-            pass
         if comm.get_world_size() > 0:
             yk = safe_sparse_dot(A, self.coef) + self.intercept
             y = comm.all_reduce(yk, op='SUM')
@@ -161,19 +147,16 @@ class Cola:
         self.is_fit = True
 
     def dump(self, modelpath):
-        # If features are split, then concatenate xk's weight
         size = np.array([0] * comm.get_world_size())
         rank = comm.get_rank()
         size[rank] = len(self.coef)
         size = comm.all_reduce(size, op='SUM')
-        # the size is [len(x_0), len(x_1), ..., len(x_{K-1})]
 
         weight = np.zeros(sum(size))
         weight[sum(size[:rank]): sum(size[:rank]) + len(self.coef)] = np.array(self.coef)
         weight = comm.reduce(weight, root=0, op='SUM')
 
         intercept = comm.reduce(self.intercept, root=0, op='SUM')
-
         if rank == 0:
             import copy
             import pickle
@@ -182,49 +165,3 @@ class Cola:
             dump_model.intercept_ = self.b_offset_ + intercept
             with open(modelpath, 'wb') as model_file:
                 pickle.dump(dump_model, model_file)
-
-    
-
-
-
-from mpi4py import MPI
-def cocoa(Ak, b, localsolver, gamma, theta, global_iters, local_iters, K, monitor):
-    if gamma <= 0 or gamma > 1:
-        raise ValueError("gamma should in (0, 1]: got {}".format(gamma))
-
-    # Shape of the matrix
-    n_rows, n_cols = Ak.shape
-
-    # Current rank of the node
-    rank = comm.get_rank()
-
-    # Initialize
-    xk = np.zeros(n_cols)
-    v = np.zeros(n_rows)
-
-    sigma = gamma * K
-    localsolver.dist_init(Ak, b, theta, local_iters, sigma)
-
-    # Initial
-    monitor.log(np.zeros(n_rows), v, xk, 0, localsolver)
-    for i_iter in range(1, 1 + global_iters):
-        # Solve the suproblem using this estimates
-        delta_xk, delta_vk = localsolver.solve(v, Ak*xk, xk)
-        # update local variables
-        xk += gamma * delta_xk
-
-        # update shared variables
-        delta_v = np.zeros_like(delta_vk)
-        MPI.COMM_WORLD.Allreduce(delta_vk, delta_v, op=MPI.SUM)
-        # assert (delta_v != old).any()
-        v += gamma * delta_v
-
-        if monitor.log(v, Ak*xk, xk, i_iter, localsolver, delta_xk):
-            if monitor.verbose >= 2:
-                print('break iterations here.')
-            break
-
-        if (i_iter % monitor.ckpt_freq) == 0:
-            monitor.save(v, xk, weightname='weight_epoch_{}.npy'.format(i_iter))
-
-    return v, xk
