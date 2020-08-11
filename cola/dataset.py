@@ -370,8 +370,21 @@ def _preprocess_data(X, y, fit_intercept, normalize=False, copy=True,
         y_offset = np.average(y, axis=0, weights=sample_weight)
         y = y - y_offset
     else:
+        if normalize:
+            if issparse(X):
+                _, X_var = mean_variance_axis(X, axis=0)
+                # transform variance to norm in-place
+                X_var *= X.shape[0]
+                X_scale = np.sqrt(X_var, X_var)
+                del X_var
+                X_scale[X_scale == 0] = 1
+                inplace_column_scale(X, 1. / X_scale)
+            else:
+                X, X_scale = f_normalize(X, axis=0, copy=False,
+                                         return_norm=True)
+        else:
+            X_scale = np.ones(X.shape[1], dtype=X.dtype)
         X_offset = np.zeros(X.shape[1], dtype=X.dtype)
-        X_scale = np.ones(X.shape[1], dtype=X.dtype)
         if y.ndim == 1:
             y_offset = X.dtype.type(0)
         else:
@@ -380,7 +393,7 @@ def _preprocess_data(X, y, fit_intercept, normalize=False, copy=True,
     return X, y, X_offset, y_offset, X_scale
 
 
-def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split_by, dataset_path=None, random_state=42,
+def load_dataset_by_rank(name, rank, world_size, dataset_size='all', datapoints=-1, split_by='features', dataset_path=None, random_state=42,
                          transpose=True, verbose=1, fit_intercept=False, normalize=False):
     r"""
     Assume the data_dir has following structure:
@@ -415,6 +428,8 @@ def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split
     y : {array-like}
         labels to the data matrix
     """
+    if dataset_path is None:
+        dataset_path = os.path.join('data', name, split_by, f'{world_size}')
     X_file = os.path.join(dataset_path, 'X', str(rank))
     y_file = os.path.join(dataset_path, 'y', str(rank))
 
@@ -450,21 +465,6 @@ def load_dataset_by_rank(name, rank, world_size, dataset_size, datapoints, split
         X = np.asfortranarray(X)
         if issplit:
             X_test = np.asfortranarray(X_test)
-
-    # n_train = X.shape[0]
-    # if issplit:
-    #     if issparse(X):
-    #         X = vstack((X, X_test))
-    #     else:
-    #         X = np.vstack((X, X_test))
-    #     y = np.vstack((y, y_test))
-    # X, y, X_offset, y_offset, X_scale = _preprocess_data(X, y, fit_intercept, normalize, copy=False)
-    # intercept = (X_offset, y_offset, X_scale)
-    # if issplit:
-    #     X_test = X[n_train:, :]
-    #     X = X[:n_train, :]
-    #     y_test = y[n_train:]
-    #     y = y[:n_train]
     
     if issparse(X):
         # For coordinate descent

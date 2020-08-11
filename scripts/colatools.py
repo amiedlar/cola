@@ -144,7 +144,7 @@ def insert_columns(editor, n, weights):
     return
 
 @cli.command('insert-column')
-@click.argument('scheme', type=click.Choice(['uniform', 'scale', 'weights']))
+@click.argument('scheme', type=click.Choice(['uniform', 'scale', 'weights', 'ones']))
 @click.option('--scale-col', default=0, help="scale specified column (default 0)")
 @click.option('--scale-by', default=1.0, help="scale factor for vector specified by `--scale-col` (default 1)")
 @click.option('--weights', type=click.STRING, default=None,
@@ -170,17 +170,19 @@ def _insert_column(editor, scheme, scale, scale_by, weights):
     elif scheme == 'uniform':
         weights = np.array([1/n_col]*n_col)
         debug_str=f'average of existing columns'
+    elif scheme == 'ones':
+        editor.data = np.column_stack((editor.data.todense(), np.ones(n_row)))
+        editor.data = csc_matrix(editor.data)
+        return
     else:
-        return NotImplementedError
+        raise NotImplementedError()
 
     if weights.shape[0] != n_col:
         weights = np.concatenate((weights, [0]*(n_col - weights.shape[0])))
     weights = weights.reshape((n_col,1))
     
-    from scipy.sparse import csc_matrix
     new_col = editor.data * weights
-    new_col = new_col.reshape((n_row,1))
-    editor.data = csc_matrix(np.concatenate((editor.data.todense(), new_col), axis=1))
+    editor.data = csc_matrix(np.column_stack((editor.data.todense(), new_col)))
     if editor.debug:
         print("Inserted new column as "+debug_str)
     return

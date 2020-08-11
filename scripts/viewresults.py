@@ -1,4 +1,4 @@
-from aurum.gld import GLD
+# from aurum.gld import GLD
 import click
 import csv
 from datetime import datetime
@@ -261,7 +261,7 @@ def plot_duality_gap(k, data, xaxis='i_iter', xlabel='global iteration step', co
     # fspec.add_plot(dual)
 
     gap = create_PlotSpec('gap', xaxis=xaxis, xlabel=xlabel)
-    fspec.add_plot(gap, label='Ring')
+    fspec.add_plot(gap)
 
     # gap_rel = create_PlotSpec('gap_rel', xaxis=xaxis, xlabel=xlabel)
     # fspec.add_plot(gap_rel)
@@ -287,12 +287,12 @@ def plot_minimizers_end(k, data, xaxis='i_iter', xlabel='global iteration step',
 
 def plot_minimizers(k, data, xaxis='i_iter', xlabel='global iteration step', comp_data=None, large=False):
     fspec = FigSpec(f'Minimizer Values, {k} nodes', data=data, comp_data=data)
-    f = create_PlotSpec('f', xaxis=xaxis, xlabel=xlabel)
-    g = create_PlotSpec('g', xaxis=xaxis, xlabel=xlabel)
+    f = create_PlotSpec('f', xaxis=xaxis, xlabel=xlabel, log_y=False)
+    g = create_PlotSpec('g', xaxis=xaxis, xlabel=xlabel, log_y=False)
     fspec.add_plot(f, label='f', comp_spec=g, comp_label='g', sidebyside=True)
 
-    f_conj = create_PlotSpec('f_conj', xaxis=xaxis, xlabel=xlabel)
-    g_conj = create_PlotSpec('g_conj', xaxis=xaxis, xlabel=xlabel)
+    f_conj = create_PlotSpec('f_conj', xaxis=xaxis, xlabel=xlabel, log_y=False)
+    g_conj = create_PlotSpec('g_conj', xaxis=xaxis, xlabel=xlabel, log_y=False)
     fspec.add_plot(f_conj, label='f*', comp_spec=g_conj, comp_label='g*', sidebyside=True)
 
     fspec.draw(large=large)
@@ -354,8 +354,10 @@ def plot_test_statistics(k, data, xaxis='i_iter', xlabel='global iteration step'
 
 def plot_linear_regression(k, dataset, logdir, check_iter=None, large=False, scaleweights=False):
     X, y, t, ind = _load_data(k, dataset, ret_split_index=True)
-    weights = _load_weights(logdir, check_iter, True)
-    regression = _predict(X, weights)
+    model = _load_model(logdir, check_iter, True)
+    #regression = model.predict(X)
+    regression = X*model.coef_ + model.intercept_
+    print(regression)
     index, index_test = ind
     from sklearn.linear_model import Lasso
     solver = Lasso(alpha=1e-4, fit_intercept=False)
@@ -428,7 +430,7 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
         return (data)/(mag)
     
     X, y, t = _load_data(k, dataset)
-    weights = _load_weights(logdir, check_iter, True)
+    model = _load_model(logdir, check_iter, True)
 
     # load profiles
     import re
@@ -463,7 +465,7 @@ def plot_profiles_and_regression(k, dataset, logdir, check_iter=None, large=Fals
     # if remove_mean:
     # for (name, data) in profile_data.items():
 
-    regression = _predict(X, weights)
+    regression = model.predict(X)
     plt.plot(t, regression, label=f"Predicted PCC Voltage")
     ax[1].legend(loc='best', fontsize='x-large')
     
@@ -481,7 +483,7 @@ def plot_power_and_regression(k, dataset, logdir, check_iter=None, large=False, 
         return (data)/(mag)
     
     X, y, t = _load_data(k, dataset)
-    weights = _load_weights(logdir, check_iter, True)
+    model = _load_model(logdir, check_iter, True)
 
     import re
     base_dataset = re.sub(r'\_.*', '', dataset)
@@ -510,7 +512,7 @@ def plot_power_and_regression(k, dataset, logdir, check_iter=None, large=False, 
     ax[0] = _add_singular_vectors_to_ax(ax[0], t, X, 3, remove_mean, print_svd, normalize)
     ax[0].legend(loc='best', fontsize='x-large')
     
-    regression = _predict(X, weights)
+    regression = model.predict(X)
 
     ax[1].plot(t, regression, label=f"Predicted PCC Voltage")
     ax[1].set_ylabel('Voltage (V)', fontsize='xx-large')#, fontsize=24)
@@ -530,9 +532,9 @@ def plot_error_hist(k, dataset, logdir, check_iter=None, large=False):
         return (data)/(mag)
     
     X, y, t, split = _load_data(k, dataset, ret_split_index=True)
-    weights = _load_weights(logdir, check_iter, True)
+    model = _load_model(logdir, check_iter, True)
 
-    regression = _predict(X, weights)
+    regression = model.predict(X)
     rel_errors = 100 * np.abs(y - regression)/np.linalg.norm(y, 2)
     print(f"Max Rel Error (decentral.): {np.max(rel_errors)}")
 
@@ -680,23 +682,21 @@ def _add_singular_vectors_to_ax(ax, t, X, n_vectors, remove_mean=True, print_svd
 
     return ax
 
-def _load_weights(logdir, check_iter=None, print_weights=False):
-    if check_iter is None:
-        print('|---> Using final weights for regression plots')
-        weights = np.load(os.path.join(logdir, f'weight.npy'), allow_pickle=True)
-        if os.path.exists(os.path.join(logdir, f'intercept.npy')):
-            intercept = np.load(os.path.join(logdir, f'intercept.npy'), allow_pickle=True)
-            weights = np.append(weights, np.asscalar(intercept))
-    else:
-        print(f'|---> Using epoch {check_iter} weights for regression plots')
-        weights = np.load(os.path.join(logdir, f'weight_epoch_{check_iter}.npy'), allow_pickle=True)
-        if os.path.exists(os.path.join(logdir, f'intercept_epoch_{check_iter}.npy')):
-            intercept = np.load(os.path.join(logdir, f'intercept_epoch_{check_iter}.npy'), allow_pickle=True)
-            weights = np.append(weights, np.asscalar(intercept))
-    weights = weights.reshape(len(weights))
+def _load_model(logdir, check_iter=None, print_weights=False):
+    # if check_iter is None:
+    print('|---> Using final weights for regression plots')
+    import pickle
+    with open(os.path.join(logdir, f'model.pickle'), 'rb') as model_file:
+        model = pickle.load(model_file)
+    # else:
+    #     print(f'|---> Using epoch {check_iter} weights for regression plots')
+    #     weights = np.load(os.path.join(logdir, f'weight_epoch_{check_iter}.npy'), allow_pickle=True)
+    #     if os.path.exists(os.path.join(logdir, f'intercept_epoch_{check_iter}.npy')):
+    #         intercept = np.load(os.path.join(logdir, f'intercept_epoch_{check_iter}.npy'), allow_pickle=True)
+    #         weights = np.append(weights, np.asscalar(intercept))
     if print_weights:
-        print(weights)
-    return weights
+        print((model.coef_, model.intercept_))
+    return model
 
 def _load_data(k, dataset, ret_split_index=False):
     data_dir = os.path.join('data', dataset, 'features', str(k))
@@ -710,14 +710,6 @@ def _load_data(k, dataset, ret_split_index=False):
     if ret_split_index:
         return X, y, t, [index, index_test]
     return X, y, t
-
-def _predict(A, x):
-    if len(x) == A.shape[1]+1:
-        return A*x[:-1] + x[-1]
-    elif len(x) == A.shape[1]:
-        return A*x
-    else:
-        raise RuntimeError("shapes don't match") 
 
 @click.group('view-results')
 def view_results():
@@ -763,11 +755,6 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
     comp_path = os.path.join(comp_path, f'{k:0>2}', topology)
     assert k is not None and k>0, 'logs not found, try specifying `logdir` and `k`' 
 
-    weights_path = os.path.join(logdir, dataset, 'final_weight.npy')
-    showres = os.path.exists(weights_path)
-    
-    res = None
-    comp_res = None
     local_results = [pd.read_csv(os.path.join(log_path,f'{i}result.csv')).loc[1:] for i in range(k)]
     global_results = pd.read_csv(os.path.join(log_path, 'result.csv')).loc[1:]
     last = np.max(global_results['i_iter'])
@@ -775,21 +762,6 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
     global_results['g_min_final'] = global_results['g'][last] - global_results['g']
     global_results['f_conj_min_final'] = global_results['f_conj'][last] - global_results['f_conj']
     global_results['g_conj_min_final'] = global_results['g_conj'][last] - global_results['g_conj']
-
-    if showres:
-        ref_weights = np.load(weights_path, allow_pickle=True)
-        ref_norm = np.linalg.norm(ref_weights)
-        niter = int(max(global_results['i_iter']))
-        res = [(i, np.linalg.norm(np.load(wf, allow_pickle=True) - ref_weights)/ref_norm) 
-            for (i, wf) in [(i, os.path.join(log_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)] 
-            if os.path.exists(wf)]
-        if compare:
-            comp_res = [(i, np.linalg.norm(np.load(wf, allow_pickle=True) - ref_weights)/ref_norm) \
-                for (i, wf) in [(i, os.path.join(comp_path, f'weight_epoch_{i}.npy')) for i in range(1,niter+1)]
-                if os.path.exists(wf)]
-        res = pd.DataFrame([*res], columns=['i_iter', 'res'])
-        if comp_res is not None: 
-            comp_res = pd.DataFrame([*comp_res], columns=['i_iter', 'res'])
 
     comp_local = None 
     comp_global = None 
@@ -810,11 +782,11 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
             plt.show()
 
     # Plotting
-    # fig = plot_local_results(k, local_results, comp_data=comp_local, large=large)
-    # saveorshow(fig, 'local.png')
+    fig = plot_local_results(k, local_results, comp_data=comp_local, large=large)
+    saveorshow(fig, 'local.png')
 
-    # fig = plot_local_cert(k, local_results, comp_data=comp_local, large=large)
-    # saveorshow(fig, 'local-cert.png')
+    fig = plot_local_cert(k, local_results, comp_data=comp_local, large=large)
+    saveorshow(fig, 'local-cert.png')
 
     fig = plot_minimizers(k, global_results, comp_data=comp_global, large=large)
     saveorshow(fig, 'minimizers.png')
@@ -831,8 +803,8 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
     fig = plot_update_and_global(local_results, global_results, large=large)
     saveorshow(fig, 'update-and-gap.png')
 
-    # fig = plot_cert_and_global(local_results, global_results, large=large)
-    # saveorshow(fig, 'cert-and-gap.png')
+    fig = plot_cert_and_global(local_results, global_results, large=large)
+    saveorshow(fig, 'cert-and-gap.png')
 
     
     # fig = plot_power_load_and_sv(k, dataset, log_path, large=False, print_svd=True, check_iter=linreg_iter)
@@ -867,12 +839,6 @@ def plot_results(k, logdir, dataset, topology, compare, compdir, save, savedir, 
         #     fig = plot_linear_regression(k, dataset, log_path, large=large, check_iter=linreg_iter, scaleweights=True)
         #     saveorshow(fig, 'linear_regression_svd.png')
         # pass
-    if showres:
-        fig = plot_update_and_global(local_results, res, global_y='res', global_ylabel=r'$\log_{10} (\|\|x_k - x^*\|\|/\|\|x^*\|\|)$')
-        saveorshow(fig, 'update-and-res.png')
-
-        # fig = plot_residual(k, res, comp_res)
-        # saveorshow(fig, 'relative_error.png') 
 
 @view_results.command('topology')
 @click.option('--k', type=click.INT, default=None, help='Number of mpi processes')

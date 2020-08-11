@@ -17,7 +17,7 @@ class Monitor(object):
     * save weight file and log files if specified;
     """
 
-    def __init__(self, solver, output_dir, ckpt_freq, graph, exit_time=None, split_by='samples', mode='local', alg='cola', Ak=None, Ak_test=None, y_test=None, y_offset=0.0, verbose=1):
+    def __init__(self, output_dir, ckpt_freq=-1, exit_time=None, split_by='features', mode='local', Ak=None, Ak_test=None, y_test=None, verbose=1, name=''):
         """
         Parameters
         ----------
@@ -35,20 +35,14 @@ class Monitor(object):
              * `local` mode only logs duality gap of local solver. 
              * `global` mode logs duality gap of the whole program. It takes more time to compute.
         """
-        assert isinstance(solver, CoCoASubproblemSolver)
+        self.name = name
         self.Ak = Ak
         self.Ak_test = Ak_test
         self.y_test = y_test
         self.do_prediction_tests = self.Ak_test is not None and self.y_test is not None
-        self.y_offset = y_offset
 
         self.rank = comm.get_rank()
         self.world_size = comm.get_world_size()
-        self.graph = graph
-
-        self.alg = alg
-
-        self.solver = solver
 
         self.running_time = 0
         self.previous_time = time.time()
@@ -63,6 +57,7 @@ class Monitor(object):
         self.ckpt_freq = ckpt_freq
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
+        self.model = None
 
         # If a problem is split by samples, then the total number of data points is unknown
         # in a local node. As a result, we will defer the division to the logging time.
@@ -80,6 +75,14 @@ class Monitor(object):
     #     comm.all_reduce(t, op=op)
     #     return t
 
+    def init(self, model, graph):
+        self.records = []
+        self.records_l = []
+        self.records_g = []
+        self.model = model
+        self.solver = self.model.localsolver
+        self.beta = graph.beta
+
     def update_sigma_sum(self):
         sigma = np.linalg.norm(self.Ak.todense()) ** 2
         n = self.Ak.shape[1]
@@ -92,24 +95,27 @@ class Monitor(object):
             self.update_sigma_sum()
 
         return self._sigma_sum
-            
 
-    def log(self, vk, Akxk, xk, i_iter, solver, Ak_scale=1, delta_xk=None, intercept=0.0, cert_cv=0.0):
+    def computeLocalSubproblem(self, xk, vknext, delta_vk):
+        K = self.world_size
+        
+        
+    def log(self, vk, Akxk, xk, i_iter, solver, delta_xk=None, delta_vk=None, intercept=0.0, cert_cv=0.0):
         # Skip the time for logging
         self.running_time += time.time() - self.previous_time
 
         if self.mode == 'local':
-            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk, cert_cv=cert_cv)
+            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk, delta_vk, cert_cv=cert_cv)
         elif self.mode == 'global':
-            self._log_global(vk, Akxk, xk, i_iter, solver, Ak_scale)
+            self._log_global(vk, Akxk, xk, i_iter, solver)
         elif self.mode == None:
             pass
         elif self.mode == 'all':
             self.records = self.records_l
-            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk, cert_cv=cert_cv)
+            self._log_local(vk, Akxk, xk, i_iter, solver, delta_xk, delta_vk, cert_cv=cert_cv)
             self.records_l = self.records
             self.records = self.records_g
-            self._log_global(vk, Akxk, xk, i_iter, solver, Ak_scale=Ak_scale, intercept=intercept)
+            self._log_global(vk, Akxk, xk, i_iter, solver, intercept=intercept)
             self.records_g = self.records
             if self.verbose >= 2:
                 print(f"[{comm.get_rank()}] Certificate, Iter {self.records[-1]['i_iter']}: "
@@ -126,7 +132,7 @@ class Monitor(object):
             gap = self.records_g[-1]['gap']
         return max_running_time > self.exit_time or abs(gap) < 1e-6
 
-    def _log_local(self, vk, Akxk, xk, i_iter, solver, delta_xk=None, cert_cv=0.0):
+    def _log_local(self, vk, Akxk, xk, i_iter, solver, delta_xk=None, delta_vk=None, cert_cv=0.0):
         record = {}
         record['i_iter'] = i_iter
         record['time'] = self.running_time
@@ -137,13 +143,30 @@ class Monitor(object):
             record['local_gap'] = 0
             record['n_iter_'] = 0
 
+        if delta_vk is not None:
+            vklast = vk - self.model.gamma * self.world_size * delta_vk 
+            if self.split_by_samples:
+                n_samples = comm.all_reduce(len(self.solver.y), op='SUM')
+            else:
+                n_samples = len(self.solver.y)
+
+            record['fk'] = self.solver.f(vklast) / self.world_size
+            Pk = self.solver.grad_f(vklast) @ delta_vk
+            cvk = self.world_size * np.linalg.norm(delta_vk, 2)**2 / (2 * self.solver.tau)
+            record['gk'] = self.solver.gk(xk)
+            record['subproblem'] = record['fk'] + Pk + cvk + record['gk']
+            record['delta_vk'] = norm(delta_vk, 2)
+        else:
+            record['fk'] = record['gk'] = record['subproblem'] = record['delta_vk'] = np.nan
+
+
         record['delta_xk'] = norm(delta_xk) if delta_xk is not None else np.nan
 
         record['cert_gap'] = (vk @ solver.grad_f(vk) + solver.gk(xk) + solver.gk_conj(solver.grad_f(vk)))
         record['cert_cv'] = cert_cv
 
         gap_rhs = 1 / (2 * comm.get_world_size())
-        cv_rhs = (1 - self.graph.beta) / (2 * np.sqrt(comm.get_world_size()) * np.sqrt(self.sigma_sum))
+        cv_rhs = (1 - self.beta) / (2 * np.sqrt(comm.get_world_size()) * np.sqrt(self.sigma_sum))
 
         record['cert_gap_scaled'] = record['cert_gap'] / gap_rhs
         record['cert_cv_scaled'] = record['cert_cv'] / cv_rhs
@@ -153,15 +176,13 @@ class Monitor(object):
         if self.verbose >= 2:
             print("Iter {i_iter:5}, Time {time:10.5e}: delta_xk={delta_xk:10.5e}, local_gap={local_gap:10.5e}, local_iters {n_iter_}".format(**record))
 
-    def _log_global(self, vk, Akxk, xk, i_iter, solver, Ak_scale=1, intercept=0.0):
+    def _log_global(self, vk, Akxk, xk, i_iter, solver, intercept=0.0):
         record = {}
         record['i_iter'] = i_iter
         record['time'] = self.running_time
 
         # v := A x
-        v = vk
-        if self.alg == 'cola':
-            v = comm.all_reduce(np.array(Akxk), op='SUM')
+        v = comm.all_reduce(np.array(Akxk), op='SUM')
         w = self.solver.grad_f(v)
 
         record['res'] = norm(v - self.solver.y) / norm(self.solver.y)
@@ -175,6 +196,9 @@ class Monitor(object):
         val_gk = self.solver.gk(xk)
         record['g'] = comm.all_reduce(val_gk, 'SUM')
         record['f'] = self.solver.f(v)
+        fk = self.solver.f(vk)
+        record['fk'] = comm.all_reduce(fk, 'AVG')
+        
 
         # Compute the value of conjugate objective
         val_gk_conj = self.solver.gk_conj(w)
@@ -189,9 +213,11 @@ class Monitor(object):
         record['g'] /= n_samples
         record['g_conj'] /= n_samples
         record['f'] /= n_samples
+        record['fk'] /= n_samples
         record['f_conj'] /= n_samples
 
         # The primal should be monotonically decreasing
+        record['H'] = record['fk'] + record['g']
         record['P'] = record['f'] + record['g']
         record['D'] = record['f_conj'] + record['g_conj']
 
@@ -204,16 +230,14 @@ class Monitor(object):
 
 
         if self.do_prediction_tests:
-            coef = xk/Ak_scale
-            y_predict = self.Ak_test*coef - intercept 
-            y_predict = comm.all_reduce(np.asarray(y_predict), op='SUM') 
-            y_predict += self.y_offset
+            y_predict = self.model.predict(self.Ak_test)
             y_test_avg = np.average(self.y_test)
             record['n_train'] = self.solver.y.shape[0]
             record['n_test'] = self.y_test.shape[0]
             record['rmse'] = np.sqrt(np.average((y_predict - self.y_test)**2))
             record['r2'] = 1.0 - np.sum((y_predict - self.y_test)**2)/np.sum((self.y_test - y_test_avg)**2)
             record['max_rel'] = np.amax(np.abs(y_predict - self.y_test)/self.y_test)
+            record['l1_rel'] = np.linalg.norm(self.y_test-y_predict, 1)/np.linalg.norm(self.y_test, 1)
             record['l2_rel'] = np.linalg.norm(self.y_test-y_predict, 2)/np.linalg.norm(self.y_test, 2)
 
         self.records.append(record)
@@ -224,7 +248,7 @@ class Monitor(object):
                   "g={g:10.3e}, f_conj={f_conj:10.3e}, g_conj={g_conj:10.3e}".format(**record))
                 
 
-    def save(self, Akxk, xk, intercept=0.0, weightname=None, logname=None):
+    def save(self, Akxk=None, intercept=None, modelname=None, logname=None):
         rank = self.rank
         if logname:
             if self.mode == 'all':
@@ -239,38 +263,27 @@ class Monitor(object):
                 if self.verbose >= 2:
                     print("Data has been save to {} on node 0".format(logfile))
 
-        if weightname:
+        if modelname:
+            modelfile = os.path.join(self.output_dir, modelname)
             if self.split_by_samples:
                 Akxk = comm.reduce(Akxk, root=0, op='SUM')
                 weight = Akxk
-
+                if rank == 0:
+                    import copy
+                    import pickle
+                    dump_model = copy.deepcopy(self.model)
+                    dump_model.coef_ = weight
+                    dump_model.intercept_ = self.model.b_offset_ - intercept
+                    with open(modelfile, 'wb') as model_file:
+                        pickle.dump(dump_model, model_file)
             else:
-                # If features are split, then concatenate xk's weight
-                size = np.array([0] * self.world_size)
-                size[rank] = len(xk)
-                size = comm.all_reduce(size, op='SUM')
-                # the size is [len(x_0), len(x_1), ..., len(x_{K-1})]
+                self.model.dump(modelfile)
+            
+            if self.rank == 0 and self.verbose >= 2:
+                print("Model has been save to {} on node 0".format(modelfile))
+                
 
-                weight = np.zeros(sum(size))
-                weight[sum(size[:rank]): sum(size[:rank]) + len(xk)] = np.array(xk)
-                if self.verbose >= 3:
-                    print(f'node {rank} weights: {weight}')
-                weight = comm.reduce(weight, root=0, op='SUM')
-                intercept = comm.reduce(intercept, root=0, op='SUM')
-
-            if rank == 0:
-                weightfile = os.path.join(self.output_dir, weightname)
-                weight.dump(weightfile)
-                if self.verbose >= 2:
-                    print("Weight has been save to {} on node 0".format(weightfile))
-                intercept = self.y_offset - intercept
-                if abs(intercept) > 1e-6:
-                    interceptfile = os.path.join(self.output_dir, weightname.replace('weight', 'intercept'))
-                    np.asarray([intercept]).dump(interceptfile)
-                    if self.verbose >= 2:
-                        print("Intercept ({}) has been save to {} on node 0".format(intercept, interceptfile))
-
-    def show_test_statistics(self, xk_final, n_train, intercept=0, Ak_test=None, y_test=None):
+    def show_test_statistics(self, n_train=None, intercept=0, Ak_test=None, y_test=None):
         comm.barrier()
         if Ak_test is None:
             Ak_test = self.Ak_test
@@ -278,28 +291,30 @@ class Monitor(object):
             y_test = self.y_test
         if Ak_test is None or y_test is None:
             raise TypeError('Ak_test and y_test must not be None')
-
-        n_test = y_test.shape[0]
+        
+        if n_train is None:
+            n_train = self.Ak.shape[0]
+        n_test = len(y_test)
         
         if self.mode in ['global', 'all']:
             rmse = self.records_g[-1]['rmse']
             r2 = self.records_g[-1]['r2']
             max_rel = self.records_g[-1]['max_rel']
+            l1_rel = self.records_g[-1]['l1_rel']
             l2_rel = self.records_g[-1]['l2_rel']
         else:
-            y_predict = Ak_test*xk_final - intercept
-            y_predict = comm.all_reduce(np.asarray(y_predict), op='SUM') 
-            y_predict += self.y_offset
-
+            y_predict = self.model.predict(self.Ak_test)
             y_test_avg = np.average(y_test)
             rmse = np.sqrt(np.average((y_predict - y_test)**2))
             r2 = 1.0 - np.sum((y_predict - y_test)**2)/np.sum((y_test - y_test_avg)**2)
             max_rel = np.amax(np.abs(y_predict - y_test)/y_test)
+            l1_rel = np.linalg.norm(y_test-y_predict, 1)/np.linalg.norm(y_test, 1)
             l2_rel = np.linalg.norm(y_test-y_predict, 2)/np.linalg.norm(y_test, 2)
 
         if self.verbose >= 1 and comm.get_rank() == 0:
             print(f'|-> Test Statistics ({n_train}/{n_test}/{n_train + n_test}): ')
             print(f'|---> max. rel. error = {max_rel}')
+            print(f'|--->   rel. L1 error = {l1_rel}')
             print(f'|--->   rel. L2 error = {l2_rel}')
             print(f'|--->            RMSE = {rmse}')
             print(f'|--->             R^2 = {r2}')

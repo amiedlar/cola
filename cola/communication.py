@@ -4,21 +4,36 @@ import numpy as np
 
 from mpi4py import MPI
 
+comm = MPI.COMM_WORLD
 
 def barrier():
-    MPI.COMM_WORLD.Barrier()
+    global comm
+    comm.Barrier()
 
 
-def init_process_group(backend):
-    pass
+def init_process_group(backend='mpi', size=None):
+    if size is None:
+        reset()        
+    else:
+        resize(size)
+    return
 
+def resize(size):
+    global comm
+    group =  MPI.COMM_WORLD.group.Incl(list(range(size)))
+    comm = MPI.COMM_WORLD.Create_group(group)
+
+def reset():
+    global comm
+    comm = MPI.COMM_WORLD
 
 def get_rank():
-    return MPI.COMM_WORLD.rank
-
+    global comm
+    return comm.rank
 
 def get_world_size():
-    return MPI.COMM_WORLD.size
+    global comm
+    return comm.size
 
 
 class CoCoAExitException(Exception):
@@ -67,11 +82,12 @@ def p2p_communicate_neighborhood_tensors(rank, neighborhood, neighorhood_tensors
     neighorhood_tensors : {dict: int->tensor}
         A dictionary from rank to tensors to be aggregated.
     """
+    global comm
     reqs = []
     for node_id in neighborhood:
         if node_id != rank:
-            reqs.append(MPI.COMM_WORLD.Isend(neighorhood_tensors[rank], node_id))
-            reqs.append(MPI.COMM_WORLD.Irecv(neighorhood_tensors[node_id], node_id))
+            reqs.append(comm.Isend(neighorhood_tensors[rank], node_id))
+            reqs.append(comm.Irecv(neighorhood_tensors[node_id], node_id))
 
     for req in reqs:
         req.Wait()
@@ -100,16 +116,21 @@ def pytorch_p2p_communicate_neighborhood_tensors(rank, neighborhood, neighorhood
 
 
 def all_reduce(data, op):
+    global comm
     if op == 'SUM':
         op = MPI.SUM
     elif op == 'MAX':
         op = MPI.MAX
-    return MPI.COMM_WORLD.allreduce(data, op=op)
+    elif op == 'AVG':
+        data = comm.allreduce(data, op=MPI.SUM)
+        return data / comm.size
+    return comm.allreduce(data, op=op)
 
 
 def reduce(data, op, root):
+    global comm
     if op == 'SUM':
         op = MPI.SUM
     elif op == 'MAX':
         op = MPI.MAX
-    return MPI.COMM_WORLD.reduce(data, op=op, root=root)
+    return comm.reduce(data, op=op, root=root)

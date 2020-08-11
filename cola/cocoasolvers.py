@@ -419,7 +419,7 @@ class LinearSVM(CoCoASubproblemSolver):
         return delta_xk, delta_Akxk
 
 
-def configure_solver(name, random_state, split_by, **params):
+def configure_solver(name, random_state, split_by='features', **params):
     if name == 'ElasticNet':
         assert split_by == 'features', 'This solver only works for splitting by features'
         solver = ElasticNet(
