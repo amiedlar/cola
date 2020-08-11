@@ -17,7 +17,7 @@ def rgb2color(r, g, b):
     return r/255, g/255, b/255
 
 def plot_train_test(ax, monitor, index, index_test):
-    y = monitor.solver.y
+    y = monitor.solver.y + monitor.model.b_offset_
     y_test = monitor.y_test
     t = np.linspace(0, 24, len(y)+len(y_test))
 
@@ -141,12 +141,11 @@ def make_stop_plot(expname, default, center, affine, savedir):
                 ax_l.semilogy(iters, local_updates[k,:], linestyle='--', label=r'$\|\|\Delta x_{k}\|\|$')
             ax_r.plot('i_iter', 'f', '', data=global_data, color='black', label='$f(Ax)$')
             
-            if mon is default:
-                ymin, ymax = ax_r.get_ylim()
-                dist = ymax - ymin
-                if dist < 0.1:
-                    ymax += (0.05 - dist)/2
-                    ymin -= (0.05 - dist)/2
+            ymin, ymax = ax_r.get_ylim()
+            dist = ymax - ymin
+            if dist < 0.1:
+                ymax += (0.1 - dist)/2
+                ymin -= (0.1 - dist)/2
                 ax_r.set_ylim(ymin, ymax)
             
             fig.tight_layout()
