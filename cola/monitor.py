@@ -65,16 +65,6 @@ class Monitor(object):
 
         self._sigma_sum = None
 
-    # def _all_reduce_scalar(self, scalar, op):
-    #     tensor = torch.DoubleTensor([scalar])
-    #     comm.all_reduce(tensor, op=op)
-    #     return float(tensor[0])
-
-    # def _all_reduce_tensor(self, tensor, op):
-    #     t = tensor.clone()
-    #     comm.all_reduce(t, op=op)
-    #     return t
-
     def init(self, model, graph):
         self.records = []
         self.records_l = []
@@ -82,24 +72,7 @@ class Monitor(object):
         self.model = model
         self.solver = self.model.localsolver
         self.beta = graph.beta
-
-    def update_sigma_sum(self):
-        sigma = np.linalg.norm(self.Ak.todense()) ** 2
-        n = self.Ak.shape[1]
-        partial = n**2 * sigma
-        self._sigma_sum = comm.all_reduce(partial, 'SUM')
-
-    @property
-    def sigma_sum(self):
-        if self._sigma_sum is None:
-            self.update_sigma_sum()
-
-        return self._sigma_sum
-
-    def computeLocalSubproblem(self, xk, vknext, delta_vk):
-        K = self.world_size
-        
-        
+       
     def log(self, vk, Akxk, xk, i_iter, solver, delta_xk=None, delta_vk=None, intercept=0.0, cert_cv=0.0):
         # Skip the time for logging
         self.running_time += time.time() - self.previous_time
@@ -145,11 +118,6 @@ class Monitor(object):
 
         if delta_vk is not None:
             vklast = vk - self.model.gamma * self.world_size * delta_vk 
-            if self.split_by_samples:
-                n_samples = comm.all_reduce(len(self.solver.y), op='SUM')
-            else:
-                n_samples = len(self.solver.y)
-
             record['fk'] = self.solver.f(vklast) / self.world_size
             Pk = self.solver.grad_f(vklast) @ delta_vk
             cvk = self.world_size * np.linalg.norm(delta_vk, 2)**2 / (2 * self.solver.tau)
@@ -159,17 +127,7 @@ class Monitor(object):
         else:
             record['fk'] = record['gk'] = record['subproblem'] = record['delta_vk'] = np.nan
 
-
         record['delta_xk'] = norm(delta_xk) if delta_xk is not None else np.nan
-
-        record['cert_gap'] = (vk @ solver.grad_f(vk) + solver.gk(xk) + solver.gk_conj(solver.grad_f(vk)))
-        record['cert_cv'] = cert_cv
-
-        gap_rhs = 1 / (2 * comm.get_world_size())
-        cv_rhs = (1 - self.beta) / (2 * np.sqrt(comm.get_world_size()) * np.sqrt(self.sigma_sum))
-
-        record['cert_gap_scaled'] = record['cert_gap'] / gap_rhs
-        record['cert_cv_scaled'] = record['cert_cv'] / cv_rhs
 
         self.records.append(record)
 
@@ -196,9 +154,6 @@ class Monitor(object):
         val_gk = self.solver.gk(xk)
         record['g'] = comm.all_reduce(val_gk, 'SUM')
         record['f'] = self.solver.f(v)
-        fk = self.solver.f(vk)
-        record['fk'] = comm.all_reduce(fk, 'AVG')
-        
 
         # Compute the value of conjugate objective
         val_gk_conj = self.solver.gk_conj(w)
@@ -213,21 +168,14 @@ class Monitor(object):
         record['g'] /= n_samples
         record['g_conj'] /= n_samples
         record['f'] /= n_samples
-        record['fk'] /= n_samples
         record['f_conj'] /= n_samples
 
         # The primal should be monotonically decreasing
-        record['H'] = record['fk'] + record['g']
         record['P'] = record['f'] + record['g']
         record['D'] = record['f_conj'] + record['g_conj']
 
         # Duality gap of the global problem
         record['gap'] = (record['D'] + record['P'])
-        if record['D'] > 0:
-            record['gap_rel'] = record['gap'] / record['D']
-        elif record['P'] > 0:
-            record['gap_rel'] = record['gap'] / record['P']
-
 
         if self.do_prediction_tests:
             y_predict = self.model.predict(self.Ak_test)
@@ -297,12 +245,6 @@ class Monitor(object):
         n_test = len(y_test)
         
         if self.mode in ['global', 'all']:
-            rmse = self.records_g[-1]['rmse']
-            r2 = self.records_g[-1]['r2']
-            max_rel = self.records_g[-1]['max_rel']
-            l1_rel = self.records_g[-1]['l1_rel']
-            l2_rel = self.records_g[-1]['l2_rel']
-        else:
             y_predict = self.model.predict(self.Ak_test)
             y_test_avg = np.average(y_test)
             rmse = np.sqrt(np.average((y_predict - y_test)**2))
