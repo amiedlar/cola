@@ -16,7 +16,7 @@ from create_report_plots import make_intercept_plots, clean_plots
 def getGraphs(K, verbose=1):
     """ Returns a dictionary of graphs with relevant topologies """
     graphs = {}
-    for topo in ['complete', 'ring', 'grid']:
+    for topo in ['ring']:
         try:
             graphs[topo] = define_graph_topology(K, topo, verbose=verbose)
         except:
@@ -38,9 +38,9 @@ def main(dataset):
     # Fix gamma = 1.0 according to:
     #   Adding vs. Averaging in Distributed Primal-Dual Optimization
     gamma = 1.0
-    theta = 1e-3
+    theta = 1e-1
     global_iters = 500
-    local_iters = 20
+    local_iters = 5
     # Initialize process group
     comm.init_process_group('mpi')
 

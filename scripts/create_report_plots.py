@@ -43,9 +43,6 @@ def get_dataframe(monitor, local=False):
     data = monitor.records_l[1:] if local else monitor.records_g[1:]
     return pd.DataFrame(data)
 
-ls = ['-', '--', ':']
-colors = ['tab:pink', 'tab:green', 'tab:purple']
-
 def clean_plots():
     if comm.get_rank() == 0:
         savedir = os.path.join('out','report','img')
@@ -72,14 +69,15 @@ def make_intercept_plots(expname, default, center, affine, index, index_test, ):
         idx = 1 - np.linspace(0, 1, 20)
         plt.rc('axes', prop_cycle = rcsetup.cycler('color', nipy(idx)))
 
-    make_intercept_regression_plot(expname, default, center, affine, index, index_test, savedir)
-    make_stop_plot(expname, default, center, affine, savedir)
-    # make_intercept_local_cert_plot(expname, default, center, savedir, type='gap')
-    # make_intercept_local_cert_plot(expname, default, center, savedir, type='cv')
-    make_intercept_global_local_plot(expname, default, center, savedir)
-    make_intercept_global_local_plot(expname, default, center, savedir, no_reg=True)
+    make_regression_plot(expname, default, center, affine, index, index_test, savedir)
+    make_stop_plot(expname, default, center, savedir)
+    make_error_plot(expname, default, center, savedir)
+    make_error_plot(expname, default, center, savedir, err='rmse')
+    make_error_plot(expname, default, center, savedir, err='max_rel')
+    make_thm1_plot(expname, default, center, savedir)
+    make_thm1_plot(expname, default, center, savedir, no_reg=True)
 
-def make_intercept_regression_plot(expname, default, center, affine, index, index_test, savedir):
+def make_regression_plot(expname, default, center, affine, index, index_test, savedir):
     rank = comm.get_rank()
     
     if center is not None:
@@ -107,9 +105,42 @@ def make_intercept_regression_plot(expname, default, center, affine, index, inde
         plt.close(fig)
     # duality gap plot
 
+def make_error_plot(expname, default, center, savedir, err='l2_rel'):
+    rank = comm.get_rank()
+    if rank!=0:
+        comm.barrier()
+        return
+    if err == 'l2_rel':
+        label = 'Relative L2 Error'
+    elif err == 'l1_rel':
+        label = 'Relative L1 Error'
+    elif err == 'max_rel':
+        label = 'Max. Relative Error'
+    elif err == 'rmse':
+        label = 'Root Mean Squared Error'
+    else:
+        comm.barrier()
+        return
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlabel('Iterations')
+    ax.set_ylabel(label)
+    global_data = get_dataframe(default)
+    ax.semilogy('i_iter', err, '', data=global_data, color='tab:purple', label='Default')
+    global_data = get_dataframe(center)
+    ax.semilogy('i_iter', err, '', data=global_data, color='tab:green', label='Center')
+
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(savedir, f'{expname}{err}-error.png'), dpi=300)
+    plt.close(fig)
+
+    comm.barrier()
+    return
+        
+
 import matplotlib._color_data as mcd
 
-def make_stop_plot(expname, default, center, affine, savedir):
+def make_stop_plot(expname, default, center, savedir):
     rank = comm.get_rank()
     for mon in [default, center]:
         comm.barrier()
@@ -143,9 +174,9 @@ def make_stop_plot(expname, default, center, affine, savedir):
             
             ymin, ymax = ax_r.get_ylim()
             dist = ymax - ymin
-            if dist < 0.1:
-                ymax += (0.1 - dist)/2
-                ymin -= (0.1 - dist)/2
+            if dist < 0.01:
+                ymax += (0.01 - dist)/2
+                ymin -= (0.01 - dist)/2
                 ax_r.set_ylim(ymin, ymax)
             
             fig.tight_layout()
@@ -153,45 +184,7 @@ def make_stop_plot(expname, default, center, affine, savedir):
             plt.close(fig)
         comm.reset()
 
-def make_intercept_local_cert_plot(expname, default, center, savedir, type='gap'):
-    rank = comm.get_rank()
-    for mon in [default, center]:
-        comm.barrier()
-        if mon is None:
-            continue
-
-        size = mon.world_size
-        comm.resize(size)
-
-        global_data = get_dataframe(mon)
-
-        local_data = get_dataframe(mon, local=True)
-        sendbuf = np.abs(np.array(local_data[f'cert_{type}']))
-        local_updates = None
-        if rank == 0:
-            local_updates = np.empty([size, len(sendbuf)])
-        comm.comm.Gather(sendbuf, local_updates, root=0)
-
-        if rank == 0:
-            fig, ax_l = plt.subplots(1, 1)
-            fig.set_size_inches(6.5, 3.5)
-            ax_r = plt.twinx(ax=ax_l)
-            ax_l.set_xlabel('Iterations')
-            label = 'Local Gap' if type=='gap' else 'Local CV'
-            ax_l.set_ylabel(label)
-            ax_r.set_ylabel(r'$f(Ax)$')
-            iters = np.asarray(local_data['i_iter'])
-            for k in range(size):
-                ax_l.semilogy(iters, local_updates[k,:], linestyle='--', label=label)
-            data = np.abs(global_data['gap'])
-            ax_r.semilogy('i_iter', data, '', data=global_data, color='black', label='$f(Ax)$')
-            
-            fig.tight_layout()
-            fig.savefig(os.path.join(savedir, f'{expname}{mon.name}_cert_{type}.png'), dpi=300)
-            plt.close(fig)
-        comm.reset()
-
-def make_intercept_global_local_plot(expname, default, center, savedir, no_reg=False):
+def make_thm1_plot(expname, default, center, savedir, no_reg=False):
     rank = comm.get_rank()
     for mon in [default, center]:
         comm.barrier()
@@ -211,7 +204,7 @@ def make_intercept_global_local_plot(expname, default, center, savedir, no_reg=F
         else:
             local_subproblem = np.array(local_data['subproblem'])
         
-        comm.reduce(local_subproblem, op='SUM', root=0)
+        local_subproblem = comm.reduce(local_subproblem, op='SUM', root=0)
 
         if rank == 0:
             fig, ax = plt.subplots(1, 1)
