@@ -28,19 +28,12 @@ setup(
     packages=[
         'cola',
         'fast_cd',
-        'randlinalg'
     ],
     entry_points={
         'console_scripts': [
-            'view-results=scripts.viewresults:view_results',
             'colatools=scripts.colatools:cli',
             'run-cola=scripts.run_cola:main',
         ]
     },
-    scripts=[
-        'scripts/runRankExperiments.sh',
-        'scripts/runTopologyExperiments.sh',
-        'scripts/runFull.sh',
-        'scripts/runSingle.sh',
-    ]
+    scripts=[]
 )

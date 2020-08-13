@@ -194,45 +194,6 @@ def _insert_column(editor, scheme, scale, scale_by, weights):
 def remove_column(editor, col):
     editor.data = csc_matrix(np.delete(editor.data.todense(), col, 1))
 
-@cli.command('decompose')
-@click.argument('method', type=click.Choice(['svd']))
-@click.option('--threshold', type=click.FLOAT, default=0.0)
-@click.option('--scale', is_flag=True)
-@click.option('--k', type=click.INT, default=None)
-@pass_editor
-def decompose(editor, method, threshold, scale, k):
-    if method == 'svd':
-        # U, s, editor.Vh = _rsvd(editor, threshold, k)
-        from randlinalg.svd import rsvd
-        k = k or editor.data.shape[1]
-        U, s, editor.Vh = rsvd(editor.data.todense(), k, threshold=threshold, random_state=editor.seed)
-        print(f'Singular Values: {s}')
-        if scale:
-            editor.s = s
-            editor.data = csc_matrix(U)
-        else:
-            S = np.diag(s)
-            editor.s = np.ones_like(s)
-            editor.data = csc_matrix(U * S)
-
-def _rsvd(editor, threshold=0.0, k=None):
-    U, s, Vh = np.linalg.svd(editor.data.todense(), False, compute_uv=True)
-    if k:
-        indices = np.s_[0:k]
-    else:
-        indices = s > threshold
-    U = U[:,indices]
-    s = s[indices]
-    Vh = Vh[indices, :]
-    return U, s, Vh
-
-@cli.command('low-rank-approx')
-@click.argument('rank', type=click.INT)
-@pass_editor
-def low_rank_approx(editor, rank):
-    U, s, Vh = _rsvd(editor, k=rank)
-    editor.data = csc_matrix(U @ np.diag(s) @ Vh)
-
 @cli.command('dump-svm')
 @click.argument('filename', type=click.STRING)
 @click.option('--overwrite', is_flag=True)
