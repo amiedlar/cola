@@ -1,0 +1,19 @@
+The following files were modified from the source distribution:
+ - cola/algo.py
+    - refactored into a class, additional log data
+ - cola/communication.py
+    - extended functionality
+ - cola/cocoasolvers.py
+    - additional logging
+ - cola/dataset.py
+    - better support for arbitrary datasets
+    - preprocessing
+ - cola/monitor.py
+    - additional logging
+ - run_cola.py
+    - slight modifications to CLI
+    - compatability update for other changed files
+ - split_dataset.py 
+    - refactored into new CLI (scripts/colatools.py)
+ - setup.py
+    - better CLI support and adherence to best practices
