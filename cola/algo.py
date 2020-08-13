@@ -2,7 +2,7 @@ r"""CoCoA family to use."""
 import warnings
 import numpy as np
 from sklearn.utils.extmath import safe_sparse_dot
-from scipy.sparse import csc_matrix
+from scipy.sparse import csc_matrix, issparse
 
 from . import communication as comm
 
@@ -88,7 +88,7 @@ class Cola:
                 rank, local_lookups, local_vs)
 
             intercept_ = -self.intercept
-            if monitor and monitor.log(averaged_v, Akxk, self.coef_, i_iter, self.localsolver, delta_xk=delta_xk, delta_vk=delta_v, intercept=intercept_):
+            if monitor and monitor.log(averaged_v, Ak @ self.coef_, self.coef_, i_iter, self.localsolver, delta_xk=delta_xk, delta_vk=delta_v, intercept=intercept_):
                 if monitor.verbose >= 1 and rank == 0:
                     print(f'break @ iter {i_iter}.')
                 break

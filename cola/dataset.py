@@ -321,6 +321,7 @@ def _preprocess_data(X, y, fit_intercept, normalize=False, copy=True,
     coordinate_descend).
     This is here because nearly all linear models will want their data to be
     centered. This function also systematically makes y consistent with X.dtype
+    Copyright (c) 2007–2020 The scikit-learn developers.
     """
     if isinstance(sample_weight, numbers.Number):
         sample_weight = None
@@ -345,12 +346,6 @@ def _preprocess_data(X, y, fit_intercept, normalize=False, copy=True,
                 X_offset[:] = X.dtype.type(0)
 
             if normalize:
-
-                # TODO: f_normalize could be used here as well but the function
-                # inplace_csr_row_normalize_l2 must be changed such that it
-                # can return also the norms computed internally
-
-                # transform variance to norm in-place
                 X_var *= X.shape[0]
                 X_scale = np.sqrt(X_var, X_var)
                 del X_var

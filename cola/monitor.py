@@ -117,7 +117,7 @@ class Monitor(object):
             record['n_iter_'] = 0
 
         if delta_vk is not None:
-            vklast = vk - self.model.gamma * self.world_size * delta_vk 
+            vklast = vk - self.model.gamma * self.world_size * delta_vk
             record['fk'] = self.solver.f(vklast) / self.world_size
             Pk = self.solver.grad_f(vklast) @ delta_vk
             cvk = self.world_size * np.linalg.norm(delta_vk, 2)**2 / (2 * self.solver.tau)

@@ -77,15 +77,16 @@ def load(editor, dataset, confirm):
 
 @cli.command('scale')
 @click.option('--center', is_flag=True)
-@click.option('--scale-var/--no-scale-var', is_flag=True, default=True)
+@click.option('--norm', is_flag=True)
 @pass_editor
-def scale(editor, center, scale_var):
+def scale(editor, center, norm):
     # from sklearn.preprocessing import scale
     # editor.data = csc_matrix(scale(editor.data.todense(), with_mean=center, with_std=scale_var))
     editor.data = editor.data.todense()
-    for i in range(editor.data.shape[1]):
-        editor.data[:,i] /= np.linalg.norm(editor.data[:,i], np.inf)
-        # print(f'||X_{i}||_2 = {np.linalg.norm(editor.data[:,i], 2)}')
+    if center:
+        editor.data -= np.average(editor.data, axis=0)
+    if norm:
+        editor.data = normalize(editor.data, axis=0, copy=False)
     editor.data = csc_matrix(editor.data)
 
 @cli.command('replace-column')

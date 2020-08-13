@@ -17,7 +17,6 @@ class CoCoASubproblemSolver(metaclass=ABCMeta):
     This solver will transform the subproblem to some standard forms so that they can
     by solved by existing solvers.
     """
-
     @property
     def tau(self):
         """Smoothness of `f`"""
@@ -78,7 +77,7 @@ class CoCoASubproblemSolver(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def recover_solution(self, xk):
+    def recover_solution(self):
         """From the standardized solution to original solution."""
         pass
 
@@ -108,58 +107,6 @@ class CoCoASubproblemSolver(metaclass=ABCMeta):
 
         return delta_xk, delta_Akxk
 
-class LinearRegression(CoCoASubproblemSolver):
-    """Least Squares linear regression"""
-    def __init__(self):
-        super(LinearRegression, self).__init__()
-
-    def grad_f(self, v):
-        v = np.asarray(v)
-        return (v - self.y)
-
-    def f(self, v):
-        v = np.asarray(v)
-        return np.linalg.norm(self.y - v) ** 2 / 2
-
-    def gk(self, xk):
-        return 0
-
-    def f_conj(self, w):
-        w = np.asarray(w)
-        return np.linalg.norm(w, 2) ** 2 / 2 + w @ self.y
-
-    def gk_conj(self, w):
-        """
-        Conjugate of Regularizer use Lemma 6 and Lemma 7 in 
-            L1-Regularized Distributed Optimization- A Communication-Efficient Primal-Dual Framework
-        """
-        w = np.asarray(w)
-        x = -w @ self.Ak
-        if self.solver_coef is None:
-            return 0
-        return 0 # x @ self.solver_coef
-
-    @property
-    def solver_coef(self):
-        return self.solver.coef
-
-    def dist_init(self, Ak, y, theta, local_iters, sigma):
-        super(LinearRegression, self).dist_init(Ak, y, theta, local_iters, sigma)
-        
-    def load_approximate_solver(self, sigma, local_iters, theta):
-        """Load approximate solver to solve the standized problem."""
-        self._tau = 1
-        from fast_cd.solver import LeastSquaresCoordSolver
-        self.solver = LeastSquaresCoordSolver(max_iter=local_iters,tol=theta, warm_start=True)
-
-    def standardize_subproblem(self, v, w):
-        """Convert subproblem to a standard form so that local solver can solve."""
-        return v  - self.tau/self.sigma * w
-
-    def recover_solution(self):
-        """From the standardized solution to original solution."""
-        return self.solver.coef
-
 
 class ElasticNet(CoCoASubproblemSolver):
     """
@@ -170,7 +117,6 @@ class ElasticNet(CoCoASubproblemSolver):
 
     Split the dataset by features.
     """
-
     def __init__(self, lambda_, l1_ratio, random_state):
         super(ElasticNet, self).__init__()
         self.lambda_ = lambda_
@@ -253,7 +199,6 @@ class LogisticRegression(CoCoASubproblemSolver):
 
     where y takes value in {-1, +1}.
     """
-
     def __init__(self, lambda_, l1_ratio, random_state):
         super(LogisticRegression, self).__init__()
         self.lambda_ = lambda_
@@ -342,7 +287,6 @@ class LinearSVM(CoCoASubproblemSolver):
 
     Note that we split the dataset by data points.
     """
-
     def __init__(self, C, random_state):
         super(LinearSVM, self).__init__()
         self.C = C
@@ -431,9 +375,6 @@ def configure_solver(name, random_state, split_by='features', **params):
         assert split_by == 'features', 'This solver only works for splitting by features'
         solver = LogisticRegression(lambda_=params['lambda_'], l1_ratio=params['l1_ratio'],
                                     random_state=random_state)
-    elif name == 'LinearRegression':
-        assert split_by == 'features'
-        solver = LinearRegression()
     else:
         raise NotImplementedError
     return solver
