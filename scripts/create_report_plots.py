@@ -4,6 +4,7 @@ from math import ceil
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+import matplotlib._color_data as mcd
 import numpy as np
 import pandas as pd
 import os
@@ -12,9 +13,6 @@ import cola.communication as comm
 from mpi4py import MPI
 import glob
 
-
-def rgb2color(r, g, b):
-    return r/255, g/255, b/255
 
 def plot_train_test(ax, monitor, index, index_test):
     y = monitor.solver.y + monitor.model.b_offset_
@@ -50,7 +48,7 @@ def clean_plots():
             for img in glob.glob(os.path.join(savedir, '*.png')):
                 os.remove(img)
 
-def make_intercept_plots(expname, default, center, affine, index, index_test, ):
+def make_intercept_plots(expname, default, center, index, index_test, reg=False):
     savedir = os.path.join('out','report','img')
     os.makedirs(savedir, exist_ok=True)
     rank = comm.get_rank()
@@ -69,15 +67,14 @@ def make_intercept_plots(expname, default, center, affine, index, index_test, ):
         idx = 1 - np.linspace(0, 1, 20)
         plt.rc('axes', prop_cycle = rcsetup.cycler('color', nipy(idx)))
 
-    make_regression_plot(expname, default, center, affine, index, index_test, savedir)
+    if reg:
+        make_regression_plot(expname, default, center, index, index_test, savedir)
+    else:
+        make_error_plot(expname, default, center, savedir)
     make_stop_plot(expname, default, center, savedir)
-    make_error_plot(expname, default, center, savedir)
-    make_error_plot(expname, default, center, savedir, err='rmse')
-    make_error_plot(expname, default, center, savedir, err='max_rel')
     make_thm1_plot(expname, default, center, savedir)
-    make_thm1_plot(expname, default, center, savedir, no_reg=True)
 
-def make_regression_plot(expname, default, center, affine, index, index_test, savedir):
+def make_regression_plot(expname, default, center, index, index_test, savedir):
     rank = comm.get_rank()
     
     if center is not None:
@@ -85,8 +82,6 @@ def make_regression_plot(expname, default, center, affine, index, index_test, sa
         default_reg = get_regression(default, index, index_test)
         center_reg = get_regression(center, index, index_test)
         comm.reset()
-    if affine is not None:
-        affine_reg = get_regression(affine, index, index_test)
     
     if rank == 0:
         # Regression Comp Plot
@@ -96,8 +91,6 @@ def make_regression_plot(expname, default, center, affine, index, index_test, sa
         t = np.linspace(0, 24, len(index)+len(index_test))
         ax.plot(t, default_reg.T, label=f'Regression - Default', linestyle='--', color='tab:purple')
         ax.plot(t, center_reg.T, label=f'Regression - Center', linestyle='-', color='black')
-        if affine is not None:
-            ax.plot(t, affine_reg.T, label=f'Regression - Affine', linestyle=':', color='tab:green')
         ax.legend()
         ax.set_xlabel('Time (h)')
         fig.tight_layout()
@@ -137,9 +130,6 @@ def make_error_plot(expname, default, center, savedir, err='l2_rel'):
     comm.barrier()
     return
         
-
-import matplotlib._color_data as mcd
-
 def make_stop_plot(expname, default, center, savedir):
     rank = comm.get_rank()
     for mon in [default, center]:

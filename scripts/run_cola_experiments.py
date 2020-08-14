@@ -33,6 +33,15 @@ def getSolversByLambda(l1_ratio, n_lambdas=10, size=1, random_state=42):
 @click.command('report_experiments')
 @click.argument('dataset', type=click.STRING)
 def main(dataset):
+    if dataset == 'inv':
+        lam = 1.
+        reg = True
+    elif dataset == 'mg':
+        lam = 1e-3
+        reg = False
+    else:
+        print('dataset not supported')
+        return
     random_state = 42
 
     # Fix gamma = 1.0 according to:
@@ -57,10 +66,7 @@ def main(dataset):
     index_test = np.asarray(np.load(os.path.join(dataset_path, 'index_test.npy'), allow_pickle=True), dtype=np.int)
 
     # Define subproblem
-    # lasso_solvers = getSolversByLambda(1, n_lambdas=10, size=len(y), random_state=random_state)
-    # elasticnet_solvers = getSolversByLambda(0.5, n_lambdas=10, size=len(y), random_state=random_state)
-    # l2_solvers = getSolversByLambda(0, n_lambdas=10, size=len(y), random_state=random_state)
-    solver = configure_solver(name='ElasticNet', l1_ratio=0.8, lambda_=1e-3/len(y), random_state=random_state)
+    solver = configure_solver(name='ElasticNet', l1_ratio=0.8, lambda_=lam/len(y), random_state=random_state)
 
     # Add hooks to log and save metrics.
     output_dir = os.path.join('out', 'report', dataset)
@@ -98,7 +104,7 @@ def main(dataset):
         mon_center.save(modelname=f'model-center-{suf}.pickle', logname=f'result-center-{suf}.csv')
 
         # Run CoLA
-        make_intercept_plots(f'{dataset}_{topo}_', mon_default, mon_center, None, index, index_test)
+        make_intercept_plots(f'{dataset}_{topo}_', mon_default, mon_center, index, index_test, reg)
 
 if __name__ == "__main__":
     main()
